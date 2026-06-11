@@ -42,6 +42,15 @@
     position:absolute; left:26px; bottom:22px; font-family:Helvetica,Arial,sans-serif;
     font-size:10px; letter-spacing:3px; color:rgba(170,160,205,.7);
   }
+  #compass { position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    width:340px; height:40px; overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent); }
+  #compass span { position:absolute; font-family:Helvetica,Arial,sans-serif; }
+  #compass .tick { top:4px; color:rgba(190,220,235,.4); font-size:9px; }
+  #compass .card { top:1px; color:rgba(225,242,250,.85); font-size:12px; letter-spacing:1px; }
+  #compass .locm { top:17px; font-size:10px; text-align:center; line-height:1.1; }
+  #compass .locm div { font-size:7px; letter-spacing:1px; opacity:.8; }
   #toast {
     position:absolute; left:50%; top:12%; transform:translateX(-50%);
     font-family:Georgia,serif; font-style:italic; font-size:15px; color:#cdb9ff;
@@ -100,10 +109,12 @@
   <div class="sub">A survey probe has landed on a planet that should not exist.<br>
   Same continents. Same rivers. Ten thousand years too late.</div>
   <div class="begin">CLICK TO BEGIN</div>
-  <div class="keys">WASD MOVE &nbsp;·&nbsp; MOUSE LOOK &nbsp;·&nbsp; E EXAMINE &nbsp;·&nbsp; ESC RELEASE</div>
+  <div class="keys">WASD MOVE &middot; SHIFT SPRINT &middot; SPACE JUMP &middot; C CROUCH &middot; MOUSE LOOK &middot; RMB ZOOM<br><br>
+  E EXAMINE &middot; F SUIT LIGHT &middot; Q SCANNER &middot; V FIRST/THIRD PERSON &middot; TAB LOG &middot; ESC RELEASE</div>
 </div>
 <div id="paused">CLICK TO CONTINUE</div>
 <div id="hud">
+  <div id="compass"></div>
   <div id="dot"></div>
   <div id="prompt">E &nbsp;—&nbsp; EXAMINE</div>
   <div id="counter">MEMORIES&nbsp; 0 / 14</div>
@@ -943,7 +954,9 @@ LOCKED:{ title:'The Sealed Gate', loc:'THE FINAL CHAMBER', text:
 /* ============================================================
    PLAYER
    ============================================================ */
-const player = { x:0, y:1.7, z:112, yaw:0, pitch:0, speed:7.2 };
+const player = { x:0, y:1.7, z:112, yaw:0, pitch:0, speed:7.2,
+  vy:0, gy:0, crouchK:0, fov:72, tp:false };
+let onGround=true, zooming=false, moving=0, bobT=0, bobReady=true;
 camera.position.set(player.x, player.y, player.z);
 camera.rotation.y = player.yaw;
 
@@ -954,7 +967,14 @@ let pendingCollect = null;
 
 addEventListener('keydown', e => {
   keys[e.code]=true;
+  if (e.code==='Space' || e.code==='Tab') e.preventDefault();
   if (e.code==='KeyE') onInteractKey();
+  if (!started || endingActive) return;
+  if (e.code==='Space' && locked && onGround){ player.vy=8.4; onGround=false; }
+  if (e.code==='KeyF' && locked){ torch.intensity = torch.intensity>0 ? 0 : 2.4; tone(1320,.07,.04,'square'); }
+  if (e.code==='KeyV' && locked){ player.tp=!player.tp; tone(980,.07,.04,'square'); }
+  if (e.code==='KeyQ') scanner();
+  if (e.code==='Tab') panelEl.classList.toggle('show');
 });
 addEventListener('keyup', e => keys[e.code]=false);
 
@@ -975,19 +995,39 @@ addEventListener('mousemove', e => {
   player.pitch -= e.movementY*0.0021;
   player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
 });
-addEventListener('mousedown', () => { if (locked) onInteractKey(); });
+addEventListener('mousedown', e => {
+  if (!locked) return;
+  if (e.button===0) onInteractKey();
+  if (e.button===2) zooming=true;
+});
+addEventListener('mouseup', e => { if (e.button===2) zooming=false; });
+addEventListener('contextmenu', e => e.preventDefault());
 
+function inWater(){ return player.x>WATER.x1 && player.x<WATER.x2 && player.z>WATER.z1 && player.z<WATER.z2; }
 function movePlayer(dt){
   if (!locked || endingActive) return;
+  // vertical physics
+  if (!onGround || player.vy!==0){
+    player.vy -= 24*dt;
+    player.gy += player.vy*dt;
+    if (player.gy<=0){ player.gy=0; player.vy=0; if(!onGround) thud(); onGround=true; }
+  }
+  // crouch blend
+  const crouching = keys['KeyC']||keys['ControlLeft'];
+  player.crouchK += ((crouching?1:0)-player.crouchK)*Math.min(1,dt*8);
   let fx=0, fz=0;
   if (keys['KeyW']) fz-=1; if (keys['KeyS']) fz+=1;
   if (keys['KeyA']) fx-=1; if (keys['KeyD']) fx+=1;
-  if (!fx && !fz) return;
+  if (!fx && !fz){ moving=0; return; }
   const len=Math.hypot(fx,fz); fx/=len; fz/=len;
   const sin=Math.sin(player.yaw), cos=Math.cos(player.yaw);
   let dx=(fx*cos + fz*sin), dz=(-fx*sin + fz*cos);
   let sp = player.speed;
-  if (player.x>WATER.x1 && player.x<WATER.x2 && player.z>WATER.z1 && player.z<WATER.z2) sp*=.62;
+  const sprinting = keys['ShiftLeft'] && fz<0;
+  if (sprinting) sp*=1.75;
+  if (crouching) sp*=.5;
+  if (inWater()) sp*=.62;
+  moving = sp;
   dx*=sp*dt; dz*=sp*dt;
   const R=.65;
   if (!blocked(player.x+dx, player.z, R)) player.x+=dx;
@@ -1115,6 +1155,21 @@ function chime(){
   const f=PENT[Math.floor(Math.random()*PENT.length)];
   tone(f,1.6,.16); tone(f*.667,2.2,.09,'sine',.12);
 }
+let stepBuf=null;
+function step(){
+  if(!actx) return;
+  if(!stepBuf){
+    const len=actx.sampleRate*.1; stepBuf=actx.createBuffer(1,len,actx.sampleRate);
+    const d=stepBuf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len);
+  }
+  const src=actx.createBufferSource(); src.buffer=stepBuf;
+  src.playbackRate.value=.7+Math.random()*.5;
+  const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=380+Math.random()*240;
+  const g=actx.createGain(); g.gain.value = inWater() ? .05 : .028;
+  src.connect(f); f.connect(g); g.connect(masterG); src.start();
+}
+function thud(){ tone(64,.28,.14); step(); }
 function swell(){
   if(!actx) return;
   const t0=actx.currentTime;
@@ -1201,6 +1256,86 @@ function updateEnding(dt, t){
 }
 
 /* ============================================================
+   SUIT — astronaut model, torch, scanner, compass
+   ============================================================ */
+const astro=(function(){
+  const g=new THREE.Group();
+  const suit=new THREE.MeshStandardMaterial({color:0xc9ced8,roughness:.6,metalness:.15});
+  const dk=new THREE.MeshStandardMaterial({color:0x394050,roughness:.7});
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(.24,.21,.55,10),suit); torso.position.y=1.05; g.add(torso);
+  const hips=new THREE.Mesh(new THREE.SphereGeometry(.21,10,8),suit); hips.position.y=.78; g.add(hips);
+  const sh=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),suit); sh.position.y=1.32; g.add(sh);
+  const helmet=new THREE.Mesh(new THREE.SphereGeometry(.19,12,10),suit); helmet.position.y=1.58; g.add(helmet);
+  const visor=new THREE.Mesh(new THREE.SphereGeometry(.155,10,8),new THREE.MeshBasicMaterial({color:0x66e8ff}));
+  visor.position.set(0,1.585,-.075); visor.scale.set(.78,.55,.7); g.add(visor);
+  const pack=new THREE.Mesh(new THREE.BoxGeometry(.34,.46,.18),dk); pack.position.set(0,1.15,.24); g.add(pack);
+  const cell=new THREE.Mesh(new THREE.BoxGeometry(.1,.3,.04),M.glowTeal); cell.position.set(0,1.15,.345); g.add(cell);
+  for(const sx of [-1,1]){
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(.065,.055,.5,8),suit);
+    arm.position.set(sx*.31,1.1,0); arm.rotation.z=sx*.14; g.add(arm);
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.085,.07,.72,8),suit);
+    leg.position.set(sx*.12,.38,0); g.add(leg);
+  }
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
+  g.visible=false; scene.add(g); return g;
+})();
+
+const torch=new THREE.SpotLight(0xfff1d8,0,44,.48,.5,1.2);
+const torchTarget=new THREE.Object3D();
+scene.add(torch); scene.add(torchTarget); torch.target=torchTarget;
+const viewDir=new THREE.Vector3();
+
+let scanCD=0; const scanRings=[];
+function scanner(){
+  if (scanCD>0 || !locked || endingActive) return;
+  scanCD=6;
+  tone(1175,.5,.07); tone(880,.9,.05,'sine',.08);
+  const m=new THREE.Mesh(new THREE.RingGeometry(.96,1,48),
+    new THREE.MeshBasicMaterial({color:0x66ffe0,transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2; m.position.set(player.x,.15,player.z);
+  scene.add(m); scanRings.push({m,t:0});
+  for(const it of interactables){
+    if(!it.collected && Math.hypot(it.x-player.x,it.z-player.z)<75){
+      it.flash=3; it.mesh.material.depthTest=false; it.mesh.renderOrder=50;
+    }
+  }
+}
+
+const compassEl=document.getElementById('compass');
+const compassItems=[];
+(function buildCompass(){
+  const cards={0:'N',90:'E',180:'S',270:'W'};
+  for(let d=0; d<360; d+=15){
+    const sp=document.createElement('span');
+    sp.className = cards[d]!==undefined ? 'card' : 'tick';
+    sp.textContent = cards[d]!==undefined ? cards[d] : '|';
+    compassEl.appendChild(sp);
+    compassItems.push({el:sp,deg:d,type:'tick'});
+  }
+  const locs=[['PLAZA',0,40,'#9fd8ff'],['SPIRE',0,-140,'#6fffe0'],['TRANSIT',140,-20,'#7eb8ff'],
+              ['HABITAT',-128,-18,'#c9a8ff'],['DOME',110,-150,'#5affc8'],['CHAMBER',0,-300,'#e0b8ff']];
+  for(const [n,x,z,c] of locs){
+    const sp=document.createElement('span');
+    sp.className='locm'; sp.style.color=c;
+    sp.innerHTML='&#9670;<div>'+n+'</div>';
+    compassEl.appendChild(sp);
+    compassItems.push({el:sp,x,z,type:'loc'});
+  }
+})();
+function updateCompass(){
+  const heading=((-player.yaw*180/Math.PI)%360+360)%360;
+  for(const it of compassItems){
+    const deg = it.type==='tick' ? it.deg
+      : (Math.atan2(it.x-player.x, -(it.z-player.z))*180/Math.PI+360)%360;
+    const delta=((deg-heading+540)%360)-180;
+    if (Math.abs(delta)>80){ it.el.style.display='none'; continue; }
+    it.el.style.display='block';
+    it.el.style.left=(170+delta*2.0)+'px';
+    it.el.style.marginLeft='-8px';
+  }
+}
+
+/* ============================================================
    POST-PROCESSING — bloom, ACES, chromatic aberration, vignette, grain
    ============================================================ */
 const POST=(function(){
@@ -1273,8 +1408,33 @@ function animate(){
 
   if (!endingActive){
     movePlayer(dt);
-    camera.position.set(player.x, player.y+Math.sin(t*1.7)*0.02, player.z);
+    const eyeY = 1.7 - player.crouchK*.62 + player.gy;
+    if (moving>0 && onGround) bobT += dt*moving*1.45;
+    const bobS=Math.sin(bobT);
+    if (bobS<-.92 && bobReady && onGround){ step(); bobReady=false; }
+    else if (bobS>0) bobReady=true;
+    const bob = onGround ? bobS*Math.min(.055, moving*.007) : 0;
+    if (!player.tp){
+      camera.position.set(player.x, eyeY+bob, player.z);
+      astro.visible=false;
+    } else {
+      astro.visible=true;
+      const cp=Math.cos(player.pitch);
+      const fwx=-Math.sin(player.yaw)*cp, fwy=Math.sin(player.pitch), fwz=-Math.cos(player.yaw)*cp;
+      camera.position.set(player.x-fwx*4.6, eyeY+1.1-fwy*4.6, player.z-fwz*4.6);
+      if (camera.position.y<.4) camera.position.y=.4;
+    }
     camera.rotation.y=player.yaw; camera.rotation.x=player.pitch;
+    astro.position.set(player.x, player.gy, player.z);
+    astro.rotation.y=player.yaw;
+    astro.rotation.z=onGround? bobS*.04*(moving>0?1:0) : .06;
+    const targetFov = zooming?40:(keys['ShiftLeft']&&moving>0?80:72);
+    player.fov += (targetFov-player.fov)*Math.min(1,dt*7);
+    if (Math.abs(player.fov-camera.fov)>.05){ camera.fov=player.fov; camera.updateProjectionMatrix(); }
+    camera.getWorldDirection(viewDir);
+    torch.position.copy(camera.position);
+    torchTarget.position.copy(camera.position).addScaledVector(viewDir,12);
+    updateCompass();
     for(const p of pulses) p.mat.emissiveIntensity=p.base+Math.sin(t*p.speed+p.phase)*p.amp;
   } else {
     updateEnding(dt,t);
@@ -1284,7 +1444,11 @@ function animate(){
   for(const it of interactables){
     it.mesh.rotation.y=t*.8+it.t;
     it.mesh.position.y=it.y+Math.sin(t*1.6+it.t)*.12;
-    const s=it.collected?.7:1+Math.sin(t*2.4+it.t)*.12;
+    let s=it.collected?.7:1+Math.sin(t*2.4+it.t)*.12;
+    if (it.flash>0){
+      it.flash-=dt; s+=.55*Math.min(1,it.flash);
+      if (it.flash<=0){ it.mesh.material.depthTest=true; it.mesh.renderOrder=0; }
+    }
     it.mesh.scale.setScalar(s);
   }
   // prompt
@@ -1329,6 +1493,13 @@ function animate(){
     window._gateSeam.material.opacity=1-e;
     window._gateSeam.scale.x=1+e*8;
     if (gateAnim>=1){ gateCollider.x1=99999; gateCollider.x2=99999; }
+  }
+  if (scanCD>0) scanCD-=dt;
+  for (let i=scanRings.length-1;i>=0;i--){
+    const r=scanRings[i]; r.t+=dt;
+    r.m.scale.setScalar(1+r.t*60);
+    r.m.material.opacity=.7*Math.max(0,1-r.t/1.3);
+    if (r.t>1.3){ scene.remove(r.m); scanRings.splice(i,1); }
   }
   for(const m of window._aur) m.uniforms.time.value=t;
   POST.render(t);
