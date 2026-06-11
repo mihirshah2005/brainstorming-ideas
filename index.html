@@ -506,7 +506,7 @@ const WATER = { x1:104, x2:196, z1:-58, z2:18 };
   // partial roofs + one collapsed slab
   addBox(120, 11.5, -20, 28, 1.4, 62, M.dark, false);
   addBox(168, 11.5, -20, 22, 1.4, 62, M.dark, false);
-  const fallen = addBox(147, 0, -8, 18, 1.2, 26, M.dark, true, .35);
+  const fallen = addBox(147, 0, -8, 18, 1.2, 26, M.dark, false, .35);
   fallen.rotation.z = .42; fallen.position.y = 4.4;
 
   // columns
@@ -588,8 +588,8 @@ const WATER = { x1:104, x2:196, z1:-58, z2:18 };
   addBox(ax, 0, az-4, 12, 4.6, 1, M.pale);              // north wall
   addBox(ax-6, 0, az, 1, 4.6, 9, M.pale);               // west
   addBox(ax+6, 0, az, 1, 4.6, 9, M.pale);               // east
-  addBox(ax-3.4, 0, az+4, 5.2, 4.6, 1, M.pale);         // south L
-  addBox(ax+3.4, 0, az+4, 5.2, 4.6, 1, M.pale);         // south R  (door gap ~1.6 wide)
+  addBox(ax-4.1, 0, az+4, 3.8, 4.6, 1, M.pale);         // south L
+  addBox(ax+4.1, 0, az+4, 3.8, 4.6, 1, M.pale);         // south R  (door gap ~4.4 wide)
   addBox(ax, 4.6, az, 13, .6, 9.6, M.dark, false);      // roof
   addBox(ax-3, 0, az-1.5, 2.6, .6, 1.6, M.dark, false); // bed slab
   addBox(ax+2.5, 0, az-1, 1.4, .8, 1.4, M.dark, false); // table
@@ -694,7 +694,8 @@ let gateL, gateR, gateCollider, gateOpen=false, gateAnim=0;
   gateL = addBox(cx-3, 0, cz+10, 6, 13, 1.4, M.pale, false);
   gateR = addBox(cx+3, 0, cz+10, 6, 13, 1.4, M.pale, false);
   gateCollider = addCollider(cx-6.2, cz+9.2, cx+6.2, cz+10.8, 'gate');
-  const seamG = new THREE.Mesh(new THREE.BoxGeometry(.18, 12.4, 1.5), M.glowViolet);
+  const seamMat = new THREE.MeshStandardMaterial({ color:0x1d0a2e, emissive:0xa86bff, emissiveIntensity:1.6, transparent:true, opacity:1 });
+  const seamG = new THREE.Mesh(new THREE.BoxGeometry(.18, 12.4, 1.5), seamMat);
   seamG.position.set(cx, 6.2, cz+10); scene.add(seamG);
   window._gateSeam = seamG;
 
@@ -820,7 +821,7 @@ LOCKED:{ title:'The Sealed Gate', loc:'THE FINAL CHAMBER', text:
 /* ============================================================
    PLAYER
    ============================================================ */
-const player = { x:0, y:1.7, z:112, yaw:Math.PI, pitch:0, speed:7.2 };
+const player = { x:0, y:1.7, z:112, yaw:0, pitch:0, speed:7.2 };
 camera.position.set(player.x, player.y, player.z);
 camera.rotation.y = player.yaw;
 
@@ -862,10 +863,10 @@ function movePlayer(dt){
   if (!fx && !fz) return;
   const len=Math.hypot(fx,fz); fx/=len; fz/=len;
   const sin=Math.sin(player.yaw), cos=Math.cos(player.yaw);
-  let dx=(fx*cos - fz*sin), dz=(-fx*sin - fz*cos);
+  let dx=(fx*cos + fz*sin), dz=(-fx*sin + fz*cos);
   let sp = player.speed;
   if (player.x>WATER.x1 && player.x<WATER.x2 && player.z>WATER.z1 && player.z<WATER.z2) sp*=.62;
-  dx*=sp*dt; dz*=-sp*dt;
+  dx*=sp*dt; dz*=sp*dt;
   const R=.65;
   if (!blocked(player.x+dx, player.z, R)) player.x+=dx;
   if (!blocked(player.x, player.z+dz, R)) player.z+=dz;
@@ -942,3 +943,214 @@ function showToast(text, ms){
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>toastEl.style.opacity=0, ms);
 }
+
+/* ============================================================
+   AUDIO — procedural ambience
+   ============================================================ */
+let actx=null, masterG=null;
+function initAudio(){
+  try{
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    masterG = actx.createGain(); masterG.gain.value=.5; masterG.connect(actx.destination);
+    // drone
+    const dg = actx.createGain(); dg.gain.value=.05;
+    const lp = actx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=320;
+    dg.connect(lp); lp.connect(masterG);
+    [[55,'sine'],[82.41,'sine'],[110,'triangle']].forEach(([f,t])=>{
+      const o=actx.createOscillator(); o.type=t; o.frequency.value=f;
+      o.detune.value=(Math.random()-.5)*8; o.connect(dg); o.start();
+    });
+    const lfo=actx.createOscillator(); lfo.frequency.value=.045;
+    const lfg=actx.createGain(); lfg.gain.value=.028;
+    lfo.connect(lfg); lfg.connect(dg.gain); lfo.start();
+    // wind
+    const len=actx.sampleRate*3;
+    const buf=actx.createBuffer(1,len,actx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=actx.createBufferSource(); src.buffer=buf; src.loop=true;
+    const bp=actx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=420; bp.Q.value=.6;
+    const wg=actx.createGain(); wg.gain.value=.025;
+    src.connect(bp); bp.connect(wg); wg.connect(masterG); src.start();
+    const wlfo=actx.createOscillator(); wlfo.frequency.value=.11;
+    const wlg=actx.createGain(); wlg.gain.value=160;
+    wlfo.connect(wlg); wlg.connect(bp.frequency); wlfo.start();
+  }catch(e){}
+}
+function tone(freq, dur, vol, type='sine', when=0){
+  if(!actx) return;
+  const t0=actx.currentTime+when;
+  const o=actx.createOscillator(); o.type=type; o.frequency.value=freq;
+  const g=actx.createGain();
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol,t0+.04);
+  g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+  o.connect(g); g.connect(masterG);
+  o.start(t0); o.stop(t0+dur+.1);
+}
+const PENT=[523.25,587.33,659.25,783.99,880];
+function chime(){
+  const f=PENT[Math.floor(Math.random()*PENT.length)];
+  tone(f,1.6,.16); tone(f*.667,2.2,.09,'sine',.12);
+}
+function swell(){
+  if(!actx) return;
+  const t0=actx.currentTime;
+  const o=actx.createOscillator(); o.frequency.setValueAtTime(82,t0);
+  o.frequency.linearRampToValueAtTime(164,t0+3.5);
+  const g=actx.createGain();
+  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(.22,t0+2);
+  g.gain.linearRampToValueAtTime(0,t0+4.5);
+  o.connect(g); g.connect(masterG); o.start(t0); o.stop(t0+5);
+  tone(330,4,.06,'sine',1.5);
+}
+
+/* ============================================================
+   THE ENDING
+   ============================================================ */
+const END_LINES = [
+'TRAVELER. YOU HAVE BEEN HEARD.',
+'You came looking for what erased us.\nNothing erased us.',
+'We erased the line between ourselves and the place.',
+'The Translation was not a departure. It was an arrival. Into stone. Into water. Into the small blue leaves you walked past without counting.',
+'Every wall that seemed to watch you, watched you. The note that bent toward your hand, bent on purpose. The walls were warm because we are the walls.',
+'We copied the Earth we lost so we would have a body worth becoming. The city is not where we lived. The city is who.',
+'But matter dreams slowly, and rain wears even a mind smooth. Ten thousand years, and we are almost weather now.',
+'We stayed awake for one last thing. Not rescue. Witness. To be known by someone, once, before we finish becoming the world.',
+'You read our goodbyes. You held the instrument. It learned your hand, too. Stone remembers. It will remember you.',
+'It is enough. Thank you.\nYou may keep the memories.',
+'We will keep the rain.'
+];
+const LINE_DUR=5.2;
+let endT=0, endCamFrom=null, endCardShown=false, lastLineIdx=-1;
+const fadeEl=document.getElementById('fade');
+const endlinesEl=document.getElementById('endlines');
+const endpEl=document.getElementById('endp');
+const endcardEl=document.getElementById('endcard');
+
+function startEnding(){
+  endingActive=true;
+  document.exitPointerLock();
+  document.getElementById('hud').style.display='none';
+  panelEl.style.display='none';
+  dialogEl.classList.remove('show');
+  pausedEl.style.display='none';
+  endCamFrom = { px:camera.position.x, py:camera.position.y, pz:camera.position.z };
+  endlinesEl.style.display='flex';
+  endT=0;
+  swell();
+}
+function updateEnding(dt, t){
+  endT+=dt;
+  // camera: slow rise and orbit around the last voice
+  const core=window._endCore;
+  const blend=Math.min(endT/5,1), e=blend*blend*(3-2*blend);
+  const ang=endT*.07+.8, rad=9+endT*.07, hgt=3+endT*.16;
+  const tx=core.position.x+Math.sin(ang)*rad, ty=Math.min(hgt,16)+core.position.y, tz=core.position.z+Math.cos(ang)*rad;
+  camera.position.set(
+    endCamFrom.px+(tx-endCamFrom.px)*e,
+    endCamFrom.py+(ty-endCamFrom.py)*e,
+    endCamFrom.pz+(tz-endCamFrom.pz)*e
+  );
+  camera.lookAt(core.position);
+  // the city dims as it finishes becoming the world
+  const dim=Math.max(0,1-endT/60);
+  for(const p of pulses) p.mat.emissiveIntensity=(p.base+Math.sin(t*p.speed+p.phase)*p.amp)*Math.max(.12,dim);
+  // lines
+  const idx=Math.floor(endT/LINE_DUR);
+  const ph=(endT%LINE_DUR)/LINE_DUR;
+  if (idx<END_LINES.length){
+    if (idx!==lastLineIdx){ lastLineIdx=idx; endpEl.textContent=END_LINES[idx]; if(idx>0) tone(PENT[idx%5]*.5,3,.05); }
+    endpEl.style.opacity = ph<.25 ? ph/.25 : (ph>.85 ? (1-ph)/.15 : 1);
+  } else {
+    endpEl.style.opacity=0;
+    if (endT>END_LINES.length*LINE_DUR+1.5){ fadeEl.style.opacity=1; }
+    if (endT>END_LINES.length*LINE_DUR+5 && !endCardShown){
+      endCardShown=true;
+      endlinesEl.style.display='none';
+      document.getElementById('endstats').innerHTML=
+        'You gathered '+collectedCount+' of '+TOTAL+' memories before the city slept.<br>'+
+        'Somewhere behind you, very gently, the lights are going out.';
+      endcardEl.style.display='flex';
+      requestAnimationFrame(()=>{ endcardEl.style.opacity=1; });
+      tone(261.63,6,.1); tone(392,6,.07,'sine',.8); tone(523.25,7,.05,'sine',1.8);
+    }
+  }
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+const clock=new THREE.Clock();
+const upVec=new THREE.Vector3(0,1,0);
+const tmpV=new THREE.Vector3();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.05);
+  const t=clock.elapsedTime;
+
+  if (!endingActive){
+    movePlayer(dt);
+    camera.position.set(player.x, player.y+Math.sin(t*1.7)*0.02, player.z);
+    camera.rotation.y=player.yaw; camera.rotation.x=player.pitch;
+    for(const p of pulses) p.mat.emissiveIntensity=p.base+Math.sin(t*p.speed+p.phase)*p.amp;
+  } else {
+    updateEnding(dt,t);
+  }
+
+  // markers
+  for(const it of interactables){
+    it.mesh.rotation.y=t*.8+it.t;
+    it.mesh.position.y=it.y+Math.sin(t*1.6+it.t)*.12;
+    const s=it.collected?.7:1+Math.sin(t*2.4+it.t)*.12;
+    it.mesh.scale.setScalar(s);
+  }
+  // prompt
+  if (!endingActive && started){
+    nearTarget=findNear();
+    if (nearTarget && !dialogOpen && locked){
+      promptEl.textContent = nearTarget.fragId==='END' ? 'E  —  LISTEN'
+        : (nearTarget.collected ? 'E  —  READ AGAIN' : 'E  —  EXAMINE');
+      promptEl.style.opacity=1;
+    } else promptEl.style.opacity=0;
+  }
+  // holographic groups quietly notice you
+  for(const g of lookerGroups){
+    const want=Math.atan2(player.x-g.position.x, player.z-g.position.z);
+    let d=want-g.rotation.y;
+    while(d>Math.PI)d-=Math.PI*2; while(d<-Math.PI)d+=Math.PI*2;
+    g.rotation.y+=d*Math.min(1,dt*.4);
+  }
+  // plants lean toward the visitor
+  for(const g of leaners){
+    const dx=player.x-g.position.x, dz=player.z-g.position.z;
+    const d2=dx*dx+dz*dz;
+    let k=0;
+    if (d2<100) k=.09*(1-d2/100);
+    const dl=Math.sqrt(d2)||1;
+    const txr=(dz/dl)*k, tzr=-(dx/dl)*k;
+    g.rotation.x+=(txr-g.rotation.x)*Math.min(1,dt*2);
+    g.rotation.z+=(tzr-g.rotation.z)*Math.min(1,dt*2);
+  }
+  // ambient motion
+  spores1.rotation.y=t*.006; spores1.position.y=Math.sin(t*.2)*1.2;
+  spores2.rotation.y=-t*.004; spores2.position.y=Math.cos(t*.16)*1.6;
+  if (waterMesh){ waterMesh.position.y=.32+Math.sin(t*.6)*.05; waterMesh.material.opacity=.68+Math.sin(t*.9)*.05; }
+  if (window._boardMat) window._boardMat.opacity=.55+Math.sin(t*7)*.12+(Math.random()<.02?-.3:0);
+  if (window._landerBlink) window._landerBlink.material.color.setHex(Math.sin(t*3)>0?0xff6a4a:0x441208);
+  if (window._endCore){ window._endCore.rotation.y=t*.3; window._endCore.rotation.x=t*.17; }
+  // the gate
+  if (gateOpen && gateAnim<1){
+    gateAnim=Math.min(1,gateAnim+dt/4);
+    const e=gateAnim*gateAnim*(3-2*gateAnim);
+    gateL.position.x=-3-5.8*e; gateR.position.x=3+5.8*e;
+    window._gateSeam.material.opacity=1-e;
+    window._gateSeam.scale.x=1+e*8;
+    if (gateAnim>=1){ gateCollider.x1=99999; gateCollider.x2=99999; }
+  }
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
