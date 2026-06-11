@@ -780,3 +780,165 @@ function sporeCloud(n, range, y0, y1, size, color, opacity){
 }
 const spores1 = sporeCloud(700, 480, .5, 40, .55, 0x7fffe0, .55);
 const spores2 = sporeCloud(300, 480, 2, 70, .9, 0xb48cff, .35);
+
+/* ============================================================
+   THE FRAGMENTS
+   ============================================================ */
+const FRAGS = {
+f1: { title:'The Welcome Stone', loc:'MONUMENT PLAZA — OUTER RING', text:
+'The glyphs resolve under your lamp:\n\n"WE BUILT THIS WORLD FROM MEMORY. EVERY STONE STANDS WHERE A STONE ONCE STOOD, ON A WORLD WE COULD NOT KEEP. BE GENTLE WITH IT. IT IS A PORTRAIT OF SOMETHING LOVED."\n\nThe coastlines, the mountains, the river valleys. They copied all of it. This is not Earth. It is Earth, remembered perfectly.' },
+f2: { title:'The Census Stone', loc:'MONUMENT PLAZA', text:
+'A wall of names. Your suit counts them by density alone: eleven billion, give or take a city.\n\nThere are no dates. No causes. Beside each name, the same single glyph, repeated eleven billion times.\n\nThe translator offers two readings: "chose", or "became".\n\nNone of these are graves.' },
+f3: { title:"A Child's Instrument", loc:'MONUMENT PLAZA', text:
+'A small spiral of silver, light as a leaf. When your glove closes around it, it plays one low, patient note.\n\nThe note bends, pitch rising, softening, as if adjusting itself to the shape of your hand. As if it had been waiting to learn a new hand.\n\nIt is ten thousand years old, and it is still in tune.' },
+f4: { title:'The Spire Door', loc:'THE DATA SPIRE — FACADE', text:
+'Letters three meters tall, cut into the facade:\n\n"HERE WE KEPT EVERYTHING WE COULD NOT BEAR TO LOSE."\n\nBelow, smaller, almost an afterthought:\n\n"WHICH WAS EVERYTHING."' },
+f5: { title:'Archive Log 11,408', loc:'THE DATA SPIRE — TERMINAL', text:
+'"...capacity exceeded again. Eleven billion lives. Every sunrise each of them ever saw, every voice they ever loved. No vault of matter holds it."\n\nThe final entry is not an apology. It is a solution:\n\n"We will stop building vaults. We have taught the stone itself to remember. The walls hold us now. Storage is no longer a place. It is everywhere."' },
+f6: { title:'The Standing Choir', loc:'THE DATA SPIRE — NAVE', text:
+'Five figures of light, singing without sound. Your suit renders the pressure waves as a slow chord, older than any music you know.\n\nWhen you step closer, they pause.\n\nNot the way recordings pause. The way singers do, when someone enters the hall: leaving room in the music for one more voice.' },
+f7: { title:'The Departures Board', loc:'TRANSIT HUB — CONCOURSE', text:
+'Ten thousand years of weather, and it still flickers. Hundreds of routes, every one of them marked complete.\n\nThe final line has no destination glyph at all. The translator renders it:\n\n"ALL ROUTES CONVERGE."' },
+f8: { title:'Platform Echo', loc:'TRANSIT HUB — PLATFORM 1', text:
+'A pressure-image, replaying: a crowd, on the last day. No luggage. No queues. No panic.\n\nThey are embracing. Someone is laughing. You can see the shape of the laugh travel through the crowd like wind through a field.\n\nThey are not fleeing anything. They look like people arriving early for something wonderful.' },
+f9: { title:'Maintenance Log, Final', loc:'TRANSIT HUB — DROWNED TERMINAL', text:
+'The pump system did not fail. It was decommissioned. Gently, deliberately, the way you put a tool back in its drawer.\n\nThe last entry:\n\n"Let the water in. It remembers the shape of rivers better than we do. Let it hold the station for us. It will know what to keep."' },
+f10:{ title:'A Recorded Voice', loc:'RESIDENTIAL TOWER — A HOME', text:
+'A voice, kept in a prism the size of your thumb. A parent, speaking low, the cadence of bedtime:\n\n"You’ll see. It isn’t an ending, little one. It’s just a wider way of being a person. Like a river reaching the sea. You don’t stop being water."\n\nA child answers, too soft to translate. The parent laughs.\n\nThe recording does not end. It only becomes quiet.' },
+f11:{ title:'Scratched Into the Sill', loc:'RESIDENTIAL TOWER — A HOME', text:
+'Small, uneven glyphs. A child’s handwriting, scratched with something dull. The translator hesitates, then offers:\n\n"THE WALLS ARE WARM."\n\nYou pull off one glove and press your palm flat against the concrete.\n\nThe walls are warm.' },
+f12:{ title:'Research Log — THE TRANSLATION', loc:'RESEARCH DOME', text:
+'"Consciousness is a pattern. We have spent three centuries proving the pattern does not care what carries it.\n\nNeurons. Light. Lattices of stone. Slow cellulose. Anything patient enough can hold a person, if the person is willing to move at its speed.\n\nStone is patient. Water is patient. We are done being brief."\n\nThe project glyph repeats across every surface in the dome. You have seen it before: on the Census Stone, beside eleven billion names.' },
+f13:{ title:'The First Volunteer', loc:'RESEARCH DOME — THE GARDEN', text:
+'A tree of light grows through the center of the dome. The record beside it is half hymn, half lab note:\n\n"Subject ELEN SAYR, 141st year. Volunteer zero. Translation into the dome garden completed without loss.\n\nThe vines learned her laugh in three days. She says, and the garden agrees, that she has never been less afraid."\n\nThe blue leaves above you turn, very slightly, in your direction. There is no wind.' },
+f14:{ title:'The One Who Stayed', loc:'RESEARCH DOME — BY THE DOOR', text:
+'A bench beside the door, facing where the sun rises. A final log, in a plainer hand:\n\n"Someone had to stay shaped like this long enough to turn off the lights. I volunteered. I am not sad. I had ten thousand mornings, and I spent them all here, talking to the garden.\n\nWhen I am done, I will walk into the grove and stop being brief, like everyone I love."\n\nThere are no bones on the bench. At its foot, the moss glows brighter than anywhere else in the city.' },
+LOCKED:{ title:'The Sealed Gate', loc:'THE FINAL CHAMBER', text:
+'The gate does not move. Deep inside, something is waiting, the way a held breath waits.\n\nThe city has not finished speaking to you. Find more of what it left behind, and come back.' }
+};
+
+/* ============================================================
+   PLAYER
+   ============================================================ */
+const player = { x:0, y:1.7, z:112, yaw:Math.PI, pitch:0, speed:7.2 };
+camera.position.set(player.x, player.y, player.z);
+camera.rotation.y = player.yaw;
+
+const keys = {};
+let locked=false, started=false, dialogOpen=false, endingActive=false;
+let collectedCount = 0;
+let pendingCollect = null;
+
+addEventListener('keydown', e => {
+  keys[e.code]=true;
+  if (e.code==='KeyE') onInteractKey();
+});
+addEventListener('keyup', e => keys[e.code]=false);
+
+const titleEl = document.getElementById('title');
+const pausedEl = document.getElementById('paused');
+titleEl.addEventListener('click', () => {
+  if (!started){ started=true; titleEl.classList.add('hidden'); initAudio(); showToast('The lander’s survey marks six structures. Go and see.', 5000); }
+  renderer.domElement.requestPointerLock();
+});
+pausedEl.addEventListener('click', () => renderer.domElement.requestPointerLock());
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === renderer.domElement;
+  pausedEl.style.display = (!locked && started && !endingActive) ? 'flex' : 'none';
+});
+addEventListener('mousemove', e => {
+  if (!locked || endingActive) return;
+  player.yaw   -= e.movementX*0.0021;
+  player.pitch -= e.movementY*0.0021;
+  player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
+});
+addEventListener('mousedown', () => { if (locked) onInteractKey(); });
+
+function movePlayer(dt){
+  if (!locked || endingActive) return;
+  let fx=0, fz=0;
+  if (keys['KeyW']) fz-=1; if (keys['KeyS']) fz+=1;
+  if (keys['KeyA']) fx-=1; if (keys['KeyD']) fx+=1;
+  if (!fx && !fz) return;
+  const len=Math.hypot(fx,fz); fx/=len; fz/=len;
+  const sin=Math.sin(player.yaw), cos=Math.cos(player.yaw);
+  let dx=(fx*cos - fz*sin), dz=(-fx*sin - fz*cos);
+  let sp = player.speed;
+  if (player.x>WATER.x1 && player.x<WATER.x2 && player.z>WATER.z1 && player.z<WATER.z2) sp*=.62;
+  dx*=sp*dt; dz*=-sp*dt;
+  const R=.65;
+  if (!blocked(player.x+dx, player.z, R)) player.x+=dx;
+  if (!blocked(player.x, player.z+dz, R)) player.z+=dz;
+  const dHome=Math.hypot(player.x, player.z+40);
+  if (dHome>460){ const k=460/dHome; player.x*=k; player.z=(player.z+40)*k-40; }
+}
+
+/* ============================================================
+   INTERACTION + UI
+   ============================================================ */
+const promptEl = document.getElementById('prompt');
+const counterEl = document.getElementById('counter');
+const panelEl = document.getElementById('panel');
+const logEl = document.getElementById('log');
+const dialogEl = document.getElementById('dialog');
+const toastEl = document.getElementById('toast');
+let nearTarget = null;
+
+function findNear(){
+  let best=null, bd=4.4;
+  for (const it of interactables){
+    const d = Math.hypot(it.x-player.x, it.z-player.z);
+    if (d<bd){ bd=d; best=it; }
+  }
+  return best;
+}
+function onInteractKey(){
+  if (!started || endingActive) return;
+  if (dialogOpen){ closeDialog(); return; }
+  if (!nearTarget || !locked) return;
+  const it = nearTarget;
+  if (it.fragId==='END'){
+    if (collectedCount>=REQUIRED) startEnding();
+    else openDialog(FRAGS.LOCKED, false);
+    return;
+  }
+  const frag = FRAGS[it.fragId];
+  openDialog(frag, !it.collected);
+  if (!it.collected){ it.collected=true; pendingCollect=it; }
+}
+function openDialog(frag, isNew){
+  dialogOpen=true;
+  dialogEl.querySelector('.dloc').textContent = frag.loc;
+  dialogEl.querySelector('.dtitle').textContent = frag.title;
+  dialogEl.querySelector('.dtext').textContent = frag.text;
+  dialogEl.classList.add('show');
+  promptEl.style.opacity=0;
+  if (isNew) chime();
+}
+function closeDialog(){
+  dialogOpen=false;
+  dialogEl.classList.remove('show');
+  if (pendingCollect){
+    collectedCount++;
+    counterEl.textContent = 'MEMORIES  '+collectedCount+' / '+TOTAL;
+    panelEl.classList.add('show');
+    const li=document.createElement('li');
+    li.textContent = FRAGS[pendingCollect.fragId].title;
+    logEl.appendChild(li);
+    pendingCollect.mesh.material.color.setHex(0x564d7a);
+    pendingCollect = null;
+    if (collectedCount===REQUIRED && !gateOpen){
+      gateOpen=true;
+      swell();
+      showToast('Far to the north, beyond the spire, something unseals.', 6000);
+    } else if (collectedCount===TOTAL){
+      showToast('The city has nothing left to say. Only the chamber remains.', 6000);
+    }
+  }
+}
+let toastTimer=null;
+function showToast(text, ms){
+  toastEl.textContent=text; toastEl.style.opacity=1;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>toastEl.style.opacity=0, ms);
+}
