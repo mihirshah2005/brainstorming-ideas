@@ -198,3 +198,364 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
+
+/* ============================================================
+   WORLD HELPERS
+   ============================================================ */
+const colliders = [];
+function addCollider(x1,z1,x2,z2,tag){
+  const c = { x1:Math.min(x1,x2), z1:Math.min(z1,z2), x2:Math.max(x1,x2), z2:Math.max(z1,z2), tag:tag||'' };
+  colliders.push(c); return c;
+}
+function blocked(x,z,r){
+  for (const c of colliders) if (x>c.x1-r && x<c.x2+r && z>c.z1-r && z<c.z2+r) return c;
+  return null;
+}
+
+const M = {
+  concrete:  new THREE.MeshStandardMaterial({ color:0x3a3e54, roughness:.95 }),
+  dark:      new THREE.MeshStandardMaterial({ color:0x272a3c, roughness:.98 }),
+  pale:      new THREE.MeshStandardMaterial({ color:0x4c5068, roughness:.9 }),
+  paving:    new THREE.MeshStandardMaterial({ color:0x1d2233, roughness:1 }),
+  glowTeal:  new THREE.MeshStandardMaterial({ color:0x0a2a24, emissive:0x36ffd9, emissiveIntensity:1.5, roughness:.5 }),
+  glowViolet:new THREE.MeshStandardMaterial({ color:0x1d0a2e, emissive:0xa86bff, emissiveIntensity:1.4, roughness:.5 }),
+  glowBlue:  new THREE.MeshStandardMaterial({ color:0x0a1430, emissive:0x5e9eff, emissiveIntensity:1.2, roughness:.5 }),
+  glowAmber: new THREE.MeshStandardMaterial({ color:0x241806, emissive:0xffd9a0, emissiveIntensity:.85, roughness:.6 }),
+  holo:      new THREE.MeshBasicMaterial({ color:0x9feaff, transparent:true, opacity:.20, blending:THREE.AdditiveBlending, depthWrite:false }),
+  beam:      new THREE.MeshBasicMaterial({ color:0x6fffe0, transparent:true, opacity:.05, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide })
+};
+const pulses = [];   // {mat, base, amp, speed, phase}
+pulses.push({ mat:M.glowTeal,   base:1.5, amp:.4, speed:.9,  phase:0 });
+pulses.push({ mat:M.glowViolet, base:1.4, amp:.4, speed:1.2, phase:2.1 });
+pulses.push({ mat:M.glowBlue,   base:1.2, amp:.35, speed:.7, phase:4.0 });
+
+function addBox(x, yBase, z, w, h, d, mat, collide=true, ry=0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x, yBase+h/2, z);
+  if (ry) m.rotation.y = ry;
+  scene.add(m);
+  if (collide){
+    if (!ry) addCollider(x-w/2, z-d/2, x+w/2, z+d/2);
+    else {
+      const cs=Math.abs(Math.cos(ry)), sn=Math.abs(Math.sin(ry));
+      const ew=(w*cs+d*sn)/2, ed=(w*sn+d*cs)/2;
+      addCollider(x-ew, z-ed, x+ew, z+ed);
+    }
+  }
+  return m;
+}
+function pillar(x,z,r,h,tiltX=0,tiltZ=0,mat=M.concrete){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r*.85,r,h,10), mat);
+  m.position.set(x,h/2,z); m.rotation.x=tiltX; m.rotation.z=tiltZ;
+  scene.add(m);
+  addCollider(x-r, z-r, x+r, z+r);
+  return m;
+}
+function path(x1,z1,x2,z2,w=5){
+  const dx=x2-x1, dz=z2-z1, len=Math.hypot(dx,dz);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w,len), new THREE.MeshStandardMaterial({color:0x1a2030, roughness:1}));
+  m.rotation.x=-Math.PI/2; m.rotation.z=-Math.atan2(dx,dz);
+  m.position.set((x1+x2)/2, .025, (z1+z2)/2);
+  scene.add(m);
+}
+function locBeam(x,z,color=0x6fffe0){
+  const mat = M.beam.clone(); mat.color.setHex(color);
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,420,12,1,true), mat);
+  b.position.set(x,210,z); scene.add(b); return b;
+}
+
+/* ---------- glyph textures ---------- */
+function glyphTexture(seed, cols=8, rows=10, color='#cfeaff', alpha=.85){
+  const r = mulberry32(seed);
+  const cv = document.createElement('canvas'); cv.width=256; cv.height=256;
+  const g = cv.getContext('2d');
+  g.strokeStyle=color; g.fillStyle=color; g.globalAlpha=alpha; g.lineWidth=2.2; g.lineCap='round';
+  const cw=256/cols, ch=256/rows;
+  for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+    if (r()<.18) continue;
+    const cx=i*cw+cw/2, cy=j*ch+ch/2, s=Math.min(cw,ch)*.32;
+    const k=Math.floor(r()*5);
+    g.beginPath();
+    if(k===0){ g.arc(cx,cy,s*.7,r()*6.28,r()*6.28+2+r()*3); }
+    else if(k===1){ g.moveTo(cx-s,cy+s); g.lineTo(cx,cy-s); g.lineTo(cx+s,cy+s); }
+    else if(k===2){ g.moveTo(cx-s,cy); g.lineTo(cx+s,cy); g.moveTo(cx,cy-s); g.lineTo(cx,cy+s*(r()<.5?1:.2)); }
+    else if(k===3){ g.moveTo(cx-s,cy-s); g.lineTo(cx+s,cy+s); g.moveTo(cx+s*.4,cy-s); g.lineTo(cx-s*.4,cy+s); }
+    else { g.rect(cx-s*.6,cy-s*.6,s*1.2,s*1.2); }
+    g.stroke();
+    if (r()<.3){ g.beginPath(); g.arc(cx,cy+ch*.36,1.8,0,6.28); g.fill(); }
+  }
+  const t = new THREE.CanvasTexture(cv); return t;
+}
+function glyphPanel(w,h,seed,glow=0x9fd8ff){
+  const mat = new THREE.MeshBasicMaterial({ map:glyphTexture(seed), transparent:true, color:glow, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
+  return new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat);
+}
+
+/* ---------- holographic figures ---------- */
+const lookerGroups = [];   // groups that slowly turn toward the player
+function holoFigure(h=1.7){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.16,.30,h*.72,8), M.holo);
+  body.position.y = h*.36;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.16,10,8), M.holo);
+  head.position.y = h*.82;
+  g.add(body, head);
+  return g;
+}
+
+/* ---------- bioluminescent flora ---------- */
+const leaners = [];   // plants that lean toward the player
+const glowMats = [M.glowTeal, M.glowViolet, M.glowBlue];
+function bioPlant(x,z,s=1){
+  const g = new THREE.Group();
+  const n = 2 + Math.floor(rng()*4);
+  for (let i=0;i<n;i++){
+    const h = (0.8+rng()*1.8)*s;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(.025*s,.05*s,h,5), M.dark);
+    const a = rng()*6.28, t = rng()*.5;
+    stem.position.set(Math.cos(a)*.18*s, h/2, Math.sin(a)*.18*s);
+    stem.rotation.set(Math.cos(a)*t, 0, Math.sin(a)*t);
+    g.add(stem);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry((.06+rng()*.1)*s, 8, 6), glowMats[Math.floor(rng()*3)]);
+    bulb.position.set(stem.position.x + Math.sin(stem.rotation.z)*-h*.5, h*.96, stem.position.z + Math.sin(stem.rotation.x)*h*.5);
+    g.add(bulb);
+  }
+  if (rng()<.55){
+    const frond = new THREE.Mesh(new THREE.ConeGeometry(.3*s, 1.1*s, 5), glowMats[Math.floor(rng()*3)]);
+    frond.position.y = .55*s; frond.scale.y = 1+rng();
+    g.add(frond);
+  }
+  g.position.set(x,0,z);
+  scene.add(g);
+  leaners.push(g);
+  return g;
+}
+function mossPatch(x,z,r){
+  const mat = new THREE.MeshBasicMaterial({ color:0x2dd9b0, transparent:true, opacity:.13, blending:THREE.AdditiveBlending, depthWrite:false });
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 14), mat);
+  m.rotation.x = -Math.PI/2; m.position.set(x,.03,z);
+  scene.add(m); return m;
+}
+
+/* ---------- interactables ---------- */
+const interactables = [];
+function addInteract(x,y,z,fragId){
+  const mk = new THREE.Mesh(new THREE.OctahedronGeometry(.30), new THREE.MeshBasicMaterial({ color:0x8effe4 }));
+  mk.position.set(x,y,z);
+  scene.add(mk);
+  interactables.push({ x, y, z, fragId, mesh:mk, collected:false, t:rng()*6 });
+}
+
+/* ============================================================
+   LOCATION 1 — MONUMENT PLAZA  (0, 40)
+   ============================================================ */
+(function plaza(){
+  const cx=0, cz=40;
+  const pav = new THREE.Mesh(new THREE.CircleGeometry(40, 36), M.paving);
+  pav.rotation.x=-Math.PI/2; pav.position.set(cx,.03,cz); scene.add(pav);
+
+  // broken pillar ring
+  for (let i=0;i<14;i++){
+    const a = i/14*Math.PI*2;
+    if (Math.abs(Math.sin(a))<.25 && Math.cos(a)<0) continue;       // gap toward spire (north)
+    if (Math.abs(Math.sin(a))<.25 && Math.cos(a)>0) continue;       // gap toward landing (south)
+    const px=cx+Math.cos(a)*31, pz=cz+Math.sin(a)*31;
+    const broken = rng()<.4;
+    pillar(px,pz,1.1, broken? 2.5+rng()*3 : 10+rng()*5, (rng()-.5)*.1, (rng()-.5)*.1);
+    if (broken && rng()<.7){
+      addBox(px+1.6, 0, pz+1.2, 2.2,1.1,2.2, M.dark, true, rng());
+    }
+  }
+
+  // central stele with glowing seams
+  addBox(cx, 0, cz, 3.2, 17, 1.4, M.pale);
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(.14, 15.6, 1.5), M.glowTeal);
+  seam.position.set(cx, 8, cz); scene.add(seam);
+  const gp1 = glyphPanel(2.6, 12, 71); gp1.position.set(cx, 8.6, cz+0.76); scene.add(gp1);
+  const gp2 = glyphPanel(2.6, 12, 72); gp2.position.set(cx, 8.6, cz-0.76); gp2.rotation.y=Math.PI; scene.add(gp2);
+
+  // census wall (curved suggestion: three angled segments)
+  addBox(cx-16, 0, cz-8, 13, 4.4, 1, M.concrete, true, .45);
+  addBox(cx-20, 0, cz+3,  11, 4.4, 1, M.concrete, true, .9);
+  addBox(cx-10, 0, cz-16, 11, 4.4, 1, M.concrete, true, .1);
+  const census = glyphPanel(11.5, 3.6, 99, 0xaed8ff);
+  census.position.set(cx-15.7, 2.3, cz-7.5); census.rotation.y=.45+Math.PI/2-1.12; scene.add(census);
+  addInteract(cx-13.5, 1.4, cz-5.9, 'f2');
+
+  // welcome obelisk at the south approach
+  const ob = new THREE.Mesh(new THREE.CylinderGeometry(.5, 1.5, 8, 4), M.pale);
+  ob.position.set(cx, 4, cz+33); ob.rotation.y=Math.PI/4; scene.add(ob);
+  addCollider(cx-1.5, cz+31.5, cx+1.5, cz+34.5);
+  const obg = glyphPanel(1.6, 5, 7); obg.position.set(cx, 3.4, cz+31.9); scene.add(obg);
+  addInteract(cx+1.8, 1.3, cz+32.5, 'f1');
+
+  // the child's instrument
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(.5,.65,1.1,8), M.dark);
+  ped.position.set(cx+11, .55, cz+6); scene.add(ped);
+  addCollider(cx+10.3, cz+5.3, cx+11.7, cz+6.7);
+  const inst = new THREE.Mesh(new THREE.TorusKnotGeometry(.22,.07,48,8), M.glowAmber);
+  inst.position.set(cx+11, 1.65, cz+6); scene.add(inst);
+  pulses.push({ mat:M.glowAmber, base:.85, amp:.5, speed:2.2, phase:1 });
+  addInteract(cx+11, 1.65, cz+6, 'f3');
+
+  // rubble + flora
+  for (let i=0;i<8;i++){
+    const a=rng()*6.28, d=12+rng()*22;
+    addBox(cx+Math.cos(a)*d, 0, cz+Math.sin(a)*d, 1+rng()*2,.5+rng(),1+rng()*2, M.dark, false, rng()*3);
+  }
+  mossPatch(cx+8, cz-10, 4); mossPatch(cx-6, cz+14, 3);
+  locBeam(cx, cz, 0x9fd8ff);
+})();
+
+/* ============================================================
+   LOCATION 2 — THE DATA SPIRE  (0, -140)
+   ============================================================ */
+(function spire(){
+  const cx=0, cz=-140;
+  // plinth
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(44,.5,44), M.paving);
+  plinth.position.set(cx,.25,cz); scene.add(plinth);
+
+  // shell walls, 26x26 footprint, door slit on south
+  const T=1.6, W=26, H=40;
+  addBox(cx, 0, cz-W/2, W+T, H, T, M.concrete);                    // north
+  addBox(cx-W/2, 0, cz, T, H, W, M.concrete);                      // west
+  addBox(cx+W/2, 0, cz, T, H, W, M.concrete);                      // east
+  addBox(cx-8.25, 0, cz+W/2, 9.5+T, H, T, M.concrete);             // south L
+  addBox(cx+8.25, 0, cz+W/2, 9.5+T, H, T, M.concrete);             // south R
+  addBox(cx, 30, cz+W/2, 7.5, 10, T, M.concrete, false);           // lintel above door
+
+  // ascending tiers — a cathedral of memory
+  let y=H;
+  const tiers=[[22,26],[18,24],[14,22],[10,20],[7,18],[4.5,16]];
+  for (const [w,h] of tiers){ addBox(cx, y, cz, w, h, w, M.concrete, false); y+=h; }
+  const needle = new THREE.Mesh(new THREE.CylinderGeometry(.4,1.4,30,8), M.pale);
+  needle.position.set(cx, y+15, cz); scene.add(needle);
+  const crown = new THREE.Mesh(new THREE.OctahedronGeometry(2.2), M.glowTeal);
+  crown.position.set(cx, y+31, cz); scene.add(crown);
+
+  // buttresses
+  for (let i=0;i<6;i++){
+    const a=i/6*Math.PI*2+.5;
+    if (Math.sin(a)>.7) continue;  // keep the door clear
+    const bx=cx+Math.cos(a)*19, bz=cz+Math.sin(a)*19;
+    const b=addBox(bx,0,bz, 2.4, 34, 6, M.dark, true, -a);
+    b.rotation.z = Math.cos(a)*.18; b.rotation.x = -Math.sin(a)*.18;
+  }
+
+  // the archive core
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.8,36,16), M.glowTeal);
+  core.position.set(cx, 18, cz); scene.add(core);
+  addCollider(cx-2.8, cz-2.8, cx+2.8, cz+2.8);
+  const coreLight = new THREE.PointLight(0x46ffd9, 1.3, 55, 2);
+  coreLight.position.set(cx, 9, cz); scene.add(coreLight);
+
+  // interior glyph walls + light shafts
+  const gw = glyphPanel(16, 26, 311, 0x8fd8e8); gw.position.set(cx, 16, cz-W/2+T); scene.add(gw);
+  for (let i=0;i<3;i++){
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 38), M.beam);
+    sh.position.set(cx-6+i*6, 19, cz-2+i*2); sh.rotation.y=.4; scene.add(sh);
+  }
+
+  // terminal
+  const term = addBox(cx-5.5, 0, cz+4, 1.2, 1.05, .9, M.dark);
+  const tscreen = new THREE.Mesh(new THREE.PlaneGeometry(.95,.6), new THREE.MeshBasicMaterial({ color:0x46ffd9, transparent:true, opacity:.5 }));
+  tscreen.position.set(cx-5.5, 1.25, cz+4.3); tscreen.rotation.x=-.5; scene.add(tscreen);
+  addInteract(cx-5.5, 1.6, cz+4, 'f5');
+
+  // the standing choir
+  const choir = new THREE.Group();
+  for (let i=0;i<5;i++){
+    const f = holoFigure(1.6+rng()*.3);
+    const a = -.9 + i*.45;
+    f.position.set(Math.cos(a)*4.5, 0, Math.sin(a)*4.5 - 3);
+    f.lookAt(0,1,0);
+    choir.add(f);
+  }
+  choir.position.set(cx+4, 0, cz-4);
+  scene.add(choir);
+  lookerGroups.push(choir);
+  addInteract(cx+4, 1.4, cz-6, 'f6');
+
+  // facade inscription
+  const ins = glyphPanel(8, 5, 47, 0xbfe8ff);
+  ins.position.set(cx, 18, cz+W/2+T*.6); scene.add(ins);
+  addInteract(cx-3.2, 1.5, cz+W/2+2.2, 'f4');
+
+  mossPatch(cx+9, cz+9, 3.5);
+  bioPlant(cx+10, cz+16, 1.4); bioPlant(cx-12, cz+13, 1.1);
+  locBeam(cx, cz, 0x6fffe0);
+})();
+
+/* ============================================================
+   LOCATION 3 — FLOODED TRANSIT HUB  (140, -20)
+   ============================================================ */
+let waterMesh;
+const WATER = { x1:104, x2:196, z1:-58, z2:18 };
+(function transit(){
+  const cx=140, cz=-20;
+  // water
+  const wm = new THREE.MeshStandardMaterial({ color:0x0d3b46, transparent:true, opacity:.72, roughness:.25, metalness:.1, emissive:0x06343c, emissiveIntensity:.5 });
+  waterMesh = new THREE.Mesh(new THREE.PlaneGeometry(92,76), wm);
+  waterMesh.rotation.x=-Math.PI/2; waterMesh.position.set(150,.32,-20);
+  scene.add(waterMesh);
+
+  // hall walls
+  addBox(140, 0, -52, 76, 12, 1.8, M.concrete);
+  addBox(140, 0,  12, 76, 12, 1.8, M.concrete);
+  // partial roofs + one collapsed slab
+  addBox(120, 11.5, -20, 28, 1.4, 62, M.dark, false);
+  addBox(168, 11.5, -20, 22, 1.4, 62, M.dark, false);
+  const fallen = addBox(147, 0, -8, 18, 1.2, 26, M.dark, true, .35);
+  fallen.rotation.z = .42; fallen.position.y = 4.4;
+
+  // columns
+  for (let i=0;i<6;i++){
+    pillar(112+i*11, -38, .9, 11.4, 0, (rng()-.5)*.06, M.pale);
+    if (i%2===0) pillar(112+i*11, -2, .9, 11.4, 0, (rng()-.5)*.06, M.pale);
+  }
+
+  // platforms (cosmetic, low)
+  addBox(140, 0, -34, 70, .4, 7, M.paving, false);
+  addBox(140, 0,  -6, 70, .4, 7, M.paving, false);
+
+  // the mag-train, half drowned
+  const train = addBox(152, 0, -24, 30, 3.4, 3.2, M.pale, true, .08);
+  train.rotation.z = -.07; train.position.y = 1.2;
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(30,.35,3.3), M.glowAmber);
+  strip.position.set(152, 2.5, -24); strip.rotation.y=.08; strip.rotation.z=-.07; scene.add(strip);
+
+  // departures board
+  const board = glyphPanel(11, 4.4, 555, 0xffe2b0);
+  board.position.set(136, 6.4, 11); board.rotation.y=Math.PI; scene.add(board);
+  window._boardMat = board.material;
+  addInteract(136, 1.5, 8.6, 'f7');
+
+  // platform echo — the last crowd
+  const crowd = new THREE.Group();
+  for (let i=0;i<9;i++){
+    const f = holoFigure(1.5+rng()*.4);
+    f.position.set((rng()-.5)*7, 0, (rng()-.5)*4);
+    f.rotation.y = rng()*6.28;
+    crowd.add(f);
+  }
+  crowd.position.set(122, .4, -34);
+  scene.add(crowd);
+  lookerGroups.push(crowd);
+  addInteract(122, 1.4, -31.5, 'f8');
+
+  // drowned terminal
+  const dt = addBox(163, 0, -33, 1.1, 1.5, .9, M.dark);
+  const dglow = new THREE.Mesh(new THREE.PlaneGeometry(.8,.5), new THREE.MeshBasicMaterial({ color:0x6fb8d8, transparent:true, opacity:.35 }));
+  dglow.position.set(163, 1.45, -32.5); dglow.rotation.x=-.5; scene.add(dglow);
+  addInteract(163, 1.9, -33, 'f9');
+
+  // broken entry arch facing the plaza
+  pillar(104, -16, 1.3, 13, 0, .08, M.concrete);
+  pillar(104, -26, 1.3, 10, 0, -.12, M.concrete);
+  addBox(104, 12.2, -21, 2.6, 1.6, 9, M.concrete, false, 0);
+
+  bioPlant(108, -10, 1.6); bioPlant(118, 6, 1.2); bioPlant(170, 8, 1.8);
+  mossPatch(112, -8, 5);
+  locBeam(cx, cz, 0x5e9eff);
+})();
