@@ -703,7 +703,7 @@ let gateL, gateR, gateCollider, gateOpen=false, gateAnim=0;
   const core = new THREE.Mesh(new THREE.DodecahedronGeometry(1.6), new THREE.MeshStandardMaterial({ color:0x14001f, emissive:0xd9b8ff, emissiveIntensity:1.8, roughness:.3 }));
   core.position.set(cx, 4.2, cz-2); scene.add(core);
   window._endCore = core;
-  const coreL = new THREE.PointLight(0xc9a8ff, 1.5, 50, 2);
+  const coreL = new THREE.PointLight(0xc9a8ff, .8, 38, 2);
   coreL.position.set(cx, 5, cz-2); scene.add(coreL);
   // glowing veins on the interior walls
   for (let i=0;i<8;i++){
@@ -1045,8 +1045,8 @@ function updateEnding(dt, t){
   // camera: slow rise and orbit around the last voice
   const core=window._endCore;
   const blend=Math.min(endT/5,1), e=blend*blend*(3-2*blend);
-  const ang=endT*.07+.8, rad=9+endT*.07, hgt=3+endT*.16;
-  const tx=core.position.x+Math.sin(ang)*rad, ty=Math.min(hgt,16)+core.position.y, tz=core.position.z+Math.cos(ang)*rad;
+  const ang=endT*.07+.8, rad=Math.min(9+endT*.05,10.5), hgt=Math.min(3+endT*.11,9.5);
+  const tx=core.position.x+Math.sin(ang)*rad, ty=hgt+core.position.y, tz=core.position.z+Math.cos(ang)*rad;
   camera.position.set(
     endCamFrom.px+(tx-endCamFrom.px)*e,
     endCamFrom.py+(ty-endCamFrom.py)*e,
@@ -1081,6 +1081,7 @@ function updateEnding(dt, t){
 /* ============================================================
    MAIN LOOP
    ============================================================ */
+window.__test = { player, interactables };
 const clock=new THREE.Clock();
 const upVec=new THREE.Vector3(0,1,0);
 const tmpV=new THREE.Vector3();
