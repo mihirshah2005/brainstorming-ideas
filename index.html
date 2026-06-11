@@ -553,10 +553,12 @@ function addInteract(x,y,z,fragId){
   }
 
   // the archive core
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.8,36,16), M.glowTeal);
+  const coreMat = new THREE.MeshStandardMaterial({ color:0x07211c, emissive:0x36ffd9, emissiveIntensity:.5, roughness:.5 });
+  pulses.push({ mat:coreMat, base:.5, amp:.14, speed:.7, phase:1.4 });
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.8,36,16), coreMat);
   core.position.set(cx, 18, cz); scene.add(core);
   addCollider(cx-2.8, cz-2.8, cx+2.8, cz+2.8);
-  const coreLight = new THREE.PointLight(0x46ffd9, 1.3, 55, 2);
+  const coreLight = new THREE.PointLight(0x46ffd9, .6, 42, 2);
   coreLight.position.set(cx, 9, cz); scene.add(coreLight);
 
   // interior glyph walls + light shafts
