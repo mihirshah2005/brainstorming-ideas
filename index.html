@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Echoes of Aphelion</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b0816; }
+  canvas { display:block; }
+  .serif { font-family: Georgia, 'Times New Roman', serif; }
+  .sans  { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+
+  #title {
+    position:fixed; inset:0; z-index:50; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; cursor:pointer;
+    background: radial-gradient(ellipse at 50% 60%, #1d1535 0%, #0b0816 70%);
+    color:#cfc6e8; text-align:center; transition: opacity 1.6s ease;
+  }
+  #title h1 { font-family:Georgia,serif; font-weight:normal; font-size:46px; letter-spacing:14px; color:#e8e2f5; text-shadow:0 0 30px rgba(120,255,220,.25); }
+  #title .sub { margin-top:18px; font-family:Georgia,serif; font-style:italic; font-size:16px; color:#9a8fc0; max-width:520px; line-height:1.6; }
+  #title .begin { margin-top:54px; font-family:Helvetica,Arial,sans-serif; font-size:13px; letter-spacing:5px; color:#7fe7cf; animation:pulse 2.4s infinite; }
+  #title .keys { margin-top:16px; font-family:Helvetica,Arial,sans-serif; font-size:11px; letter-spacing:2px; color:#5d557e; }
+  @keyframes pulse { 0%,100%{opacity:.45} 50%{opacity:1} }
+  #title.hidden { opacity:0; pointer-events:none; }
+
+  #paused {
+    position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center;
+    background:rgba(8,6,18,.55); color:#9a8fc0; font-family:Helvetica,Arial,sans-serif;
+    font-size:13px; letter-spacing:4px; cursor:pointer;
+  }
+
+  #hud { position:fixed; inset:0; z-index:20; pointer-events:none; }
+  #dot { position:absolute; left:50%; top:50%; width:4px; height:4px; margin:-2px 0 0 -2px;
+         border-radius:50%; background:rgba(220,240,235,.65); }
+  #prompt {
+    position:absolute; left:50%; bottom:18%; transform:translateX(-50%);
+    font-family:Helvetica,Arial,sans-serif; font-size:12px; letter-spacing:4px;
+    color:#aef2e0; text-shadow:0 0 12px rgba(110,255,215,.5); opacity:0; transition:opacity .25s;
+  }
+  #counter {
+    position:absolute; left:26px; bottom:22px; font-family:Helvetica,Arial,sans-serif;
+    font-size:10px; letter-spacing:3px; color:rgba(170,160,205,.7);
+  }
+  #toast {
+    position:absolute; left:50%; top:12%; transform:translateX(-50%);
+    font-family:Georgia,serif; font-style:italic; font-size:15px; color:#cdb9ff;
+    text-shadow:0 0 14px rgba(150,110,255,.5); opacity:0; transition:opacity 1.2s; text-align:center;
+  }
+
+  #panel {
+    position:fixed; right:0; top:0; bottom:0; width:230px; z-index:25; pointer-events:none;
+    padding:26px 20px; background:linear-gradient(to left, rgba(10,8,20,.55), rgba(10,8,20,0));
+    transform:translateX(40px); opacity:0; transition:all .8s ease;
+  }
+  #panel.show { transform:none; opacity:1; }
+  #panel h3 { font-family:Helvetica,Arial,sans-serif; font-size:10px; letter-spacing:4px;
+              color:rgba(170,225,210,.65); margin-bottom:14px; font-weight:normal; }
+  #log { list-style:none; }
+  #log li { font-family:Georgia,serif; font-size:12px; color:rgba(205,195,235,.85);
+            padding:5px 0; border-bottom:1px solid rgba(140,120,200,.12); opacity:0; animation:fadein 1.2s forwards; }
+  @keyframes fadein { to { opacity:1 } }
+
+  #dialog {
+    position:fixed; left:50%; bottom:7%; transform:translateX(-50%) translateY(14px);
+    width:min(620px, 86vw); z-index:30; padding:26px 32px;
+    background:rgba(10,7,22,.82); border:1px solid rgba(140,200,225,.18);
+    border-radius:3px; backdrop-filter:blur(6px);
+    opacity:0; pointer-events:none; transition:all .4s ease;
+  }
+  #dialog.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #dialog .dloc { font-family:Helvetica,Arial,sans-serif; font-size:9px; letter-spacing:3px; color:#6fd8be; margin-bottom:6px; }
+  #dialog .dtitle { font-family:Georgia,serif; font-size:19px; color:#ece6fa; margin-bottom:12px; }
+  #dialog .dtext { font-family:Georgia,serif; font-size:14px; line-height:1.75; color:#bdb3d8; white-space:pre-line; }
+  #dialog .dhint { margin-top:16px; font-family:Helvetica,Arial,sans-serif; font-size:9px; letter-spacing:3px; color:#564f78; }
+
+  #fade { position:fixed; inset:0; z-index:60; background:#000; opacity:0; pointer-events:none; transition:opacity 3s ease; }
+  #endlines {
+    position:fixed; inset:0; z-index:61; display:none; align-items:center; justify-content:center;
+    pointer-events:none; padding:0 14vw; text-align:center;
+  }
+  #endlines p { font-family:Georgia,serif; font-size:clamp(17px,2.4vw,26px); line-height:1.8; color:#ded5f2;
+                text-shadow:0 0 22px rgba(140,120,255,.35); opacity:0; transition:opacity 1.8s ease; }
+  #endcard {
+    position:fixed; inset:0; z-index:62; display:none; flex-direction:column; align-items:center; justify-content:center;
+    background:#030208; color:#cfc6e8; text-align:center; opacity:0; transition:opacity 2.5s ease;
+  }
+  #endcard h1 { font-family:Georgia,serif; font-weight:normal; font-size:40px; letter-spacing:12px; color:#e8e2f5; }
+  #endcard .est { margin-top:24px; font-family:Georgia,serif; font-style:italic; font-size:15px; color:#9a8fc0; line-height:2; }
+  #endcard button {
+    margin-top:50px; padding:13px 38px; background:none; border:1px solid rgba(127,231,207,.4);
+    color:#7fe7cf; font-family:Helvetica,Arial,sans-serif; font-size:11px; letter-spacing:5px; cursor:pointer;
+  }
+  #endcard button:hover { background:rgba(127,231,207,.08); }
+</style>
+</head>
+<body>
+<div id="title">
+  <h1>ECHOES OF APHELION</h1>
+  <div class="sub">A survey probe has landed on a planet that should not exist.<br>
+  Same continents. Same rivers. Ten thousand years too late.</div>
+  <div class="begin">CLICK TO BEGIN</div>
+  <div class="keys">WASD MOVE &nbsp;·&nbsp; MOUSE LOOK &nbsp;·&nbsp; E EXAMINE &nbsp;·&nbsp; ESC RELEASE</div>
+</div>
+<div id="paused">CLICK TO CONTINUE</div>
+<div id="hud">
+  <div id="dot"></div>
+  <div id="prompt">E &nbsp;—&nbsp; EXAMINE</div>
+  <div id="counter">MEMORIES&nbsp; 0 / 14</div>
+  <div id="toast"></div>
+</div>
+<div id="panel"><h3>RECOVERED MEMORIES</h3><ul id="log"></ul></div>
+<div id="dialog">
+  <div class="dloc"></div>
+  <div class="dtitle"></div>
+  <div class="dtext"></div>
+  <div class="dhint">E TO CLOSE</div>
+</div>
+<div id="fade"></div>
+<div id="endlines"><p id="endp"></p></div>
+<div id="endcard">
+  <h1>ECHOES OF APHELION</h1>
+  <div class="est" id="endstats"></div>
+  <button onclick="location.reload()">WALK AGAIN</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* ============================================================
+   ECHOES OF APHELION — a quiet archaeology
+   ============================================================ */
+
+const REQUIRED = 10;          // fragments needed to unseal the chamber
+const TOTAL = 14;
+
+/* ---------- seeded rng ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const rng = mulberry32(40961);
+
+/* ---------- renderer / scene / camera ---------- */
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a2144);
+scene.fog = new THREE.FogExp2(0x342a52, 0.0052);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 1500);
+camera.rotation.order = 'YXZ';
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- sky dome ---------- */
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite:false, fog:false,
+  uniforms: { top:{value:new THREE.Color(0x14102b)}, mid:{value:new THREE.Color(0x3a2f5e)}, low:{value:new THREE.Color(0x2e4a55)} },
+  vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: 'uniform vec3 top,mid,low; varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 c = h>0.18 ? mix(mid,top,smoothstep(0.18,0.85,h)) : mix(low,mid,smoothstep(-0.08,0.18,h)); gl_FragColor = vec4(c,1.0); }'
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1100, 24, 16), skyMat);
+scene.add(sky);
+
+/* ---------- the wrong sun ---------- */
+const sunDir = new THREE.Vector3(0.45, 0.42, -0.79).normalize();
+const sunDisc = new THREE.Mesh(
+  new THREE.CircleGeometry(72, 40),
+  new THREE.MeshBasicMaterial({ color:0xf0f5d8, fog:false, transparent:true, opacity:0.95 })
+);
+sunDisc.position.copy(sunDir).multiplyScalar(950);
+sunDisc.lookAt(0,0,0);
+scene.add(sunDisc);
+const sunHalo = new THREE.Mesh(
+  new THREE.CircleGeometry(150, 40),
+  new THREE.MeshBasicMaterial({ color:0xc8e8c0, fog:false, transparent:true, opacity:0.16, blending:THREE.AdditiveBlending, depthWrite:false })
+);
+sunHalo.position.copy(sunDir).multiplyScalar(940);
+sunHalo.lookAt(0,0,0);
+scene.add(sunHalo);
+
+/* ---------- lights ---------- */
+scene.add(new THREE.HemisphereLight(0x6a5a9e, 0x131e26, 0.85));
+const sunLight = new THREE.DirectionalLight(0xe9e6cc, 0.55);
+sunLight.position.copy(sunDir).multiplyScalar(400);
+scene.add(sunLight);
+
+/* ---------- ground ---------- */
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(700, 48),
+  new THREE.MeshStandardMaterial({ color:0x111726, roughness:1, metalness:0 })
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
