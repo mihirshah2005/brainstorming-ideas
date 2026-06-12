@@ -52,6 +52,22 @@ function grungeTexture(seed, base, dark, light, streaks){
   g.globalAlpha=1;
   const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
 }
+function facadeTexture(seed,glow){
+  const r=mulberry32(seed);
+  const cv=document.createElement('canvas'); cv.width=128; cv.height=256;
+  const g=cv.getContext('2d');
+  g.fillStyle='#1a1f2e'; g.fillRect(0,0,128,256);
+  const cols=8, rows=20, cw=128/cols, ch=256/rows;
+  for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+    const lit=r()<.26;
+    if(lit){ g.fillStyle = r()<.5 ? '#46ffd9' : '#a86bff'; g.globalAlpha=.4+r()*.5; }
+    else { g.fillStyle='#0c1018'; g.globalAlpha=1; }
+    g.fillRect(i*cw+cw*.2, j*ch+ch*.25, cw*.6, ch*.5);
+  }
+  g.globalAlpha=1;
+  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
+window.facadeTexture=facadeTexture;
 const concTex=grungeTexture(11,'#8a8f9e','#5a5e6c','#abb0bb',true);
 const concBump=grungeTexture(12,'#808080','#383838','#c8c8c8',true);
 [M.concrete,M.dark,M.pale].forEach(m=>{ m.map=concTex; m.bumpMap=concBump; m.bumpScale=.02; m.needsUpdate=true; });

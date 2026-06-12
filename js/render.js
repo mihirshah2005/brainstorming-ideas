@@ -23,13 +23,16 @@ const POST=(function(){
     ' s+=(texture2D(t,vUv+px*1.384).rgb+texture2D(t,vUv-px*1.384).rgb)*.316;\n'+
     ' s+=(texture2D(t,vUv+px*3.230).rgb+texture2D(t,vUv-px*3.230).rgb)*.07;\n'+
     ' gl_FragColor=vec4(s,1.);}'});
-  const finalMat=new THREE.ShaderMaterial({uniforms:{t:{value:null},b1:{value:null},b2:{value:null},time:{value:0},strength:{value:.85}},vertexShader:VS,fragmentShader:
-    'uniform sampler2D t,b1,b2; uniform float time,strength; varying vec2 vUv;\n'+
+  const finalMat=new THREE.ShaderMaterial({uniforms:{t:{value:null},b1:{value:null},b2:{value:null},time:{value:0},strength:{value:.85},sunUV:{value:new THREE.Vector2(.5,.7)},sunVis:{value:0}},vertexShader:VS,fragmentShader:
+    'uniform sampler2D t,b1,b2; uniform float time,strength,sunVis; uniform vec2 sunUV; varying vec2 vUv;\n'+
     'vec3 aces(vec3 x){ return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.); }\n'+
     'float rnd(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }\n'+
     'void main(){ vec2 d=(vUv-.5)*.004;\n'+
     ' vec3 c; c.r=texture2D(t,vUv+d).r; c.g=texture2D(t,vUv).g; c.b=texture2D(t,vUv-d).b;\n'+
     ' c+=(texture2D(b1,vUv).rgb+texture2D(b2,vUv).rgb)*strength;\n'+
+    ' vec2 dir=(sunUV-vUv); vec3 gr=vec3(0.); float il=1.;\n'+
+    ' for(int gi=0; gi<10; gi++){ vec2 sp=vUv+dir*(float(gi)/10.)*.6; gr+=texture2D(b1,sp).rgb*il; il*=.85; }\n'+
+    ' c+=gr*0.10*sunVis*vec3(1.0,.96,.82);\n'+
     ' c=aces(c*1.22);\n'+
     ' float vg=smoothstep(1.25,.45,length(vUv-.5)*1.6); c*=.34+.66*vg;\n'+
     ' c+=(rnd(vUv*vec2(1920.,1080.)+mod(time,10.)*60.)-.5)*.045*(1.-vg*.5);\n'+
@@ -37,7 +40,11 @@ const POST=(function(){
     ' gl_FragColor=vec4(c,1.);}'});
   function pass(mat,inTex,outRT){ quad.material=mat; if(mat.uniforms.t) mat.uniforms.t.value=inTex;
     renderer.setRenderTarget(outRT); renderer.render(scn2,cam2); }
+  const _sv=new THREE.Vector3();
   function render(t){
+    _sv.copy(sunDir).multiplyScalar(950).project(camera);
+    finalMat.uniforms.sunUV.value.set(_sv.x*.5+.5, _sv.y*.5+.5);
+    finalMat.uniforms.sunVis.value = (_sv.z<1 && Math.abs(_sv.x)<1.3 && Math.abs(_sv.y)<1.3) ? 1 : 0;
     renderer.setRenderTarget(sceneRT); renderer.render(scene,camera);
     pass(brightMat,sceneRT.texture,rtA);
     blurMat.uniforms.res.value.set(w>>1,h>>1);
@@ -176,6 +183,7 @@ function animate(){
     r.m.material.opacity=.7*Math.max(0,1-r.t/1.3);
     if (r.t>1.3){ scene.remove(r.m); scanRings.splice(i,1); }
   }
+  if (window._skyUpdate) window._skyUpdate(t);
   if (window.UI) UI.update(dt, t);
   for(const m of window._aur) m.uniforms.time.value=t;
   POST.render(t);

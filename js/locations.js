@@ -420,12 +420,19 @@ path(0,-156, 0,-282, 4);                               // spire → chamber
   window._landerBlink = blink;
 })();
 
-// distant ruined skyline — silhouettes in the fog
+// distant ruined skyline — silhouettes in the fog, some with lit facades
+const facadeMats=[];
+for(let i=0;i<5;i++){
+  const ft=window.facadeTexture(900+i); ft.repeat.set(2,5);
+  facadeMats.push(new THREE.MeshStandardMaterial({map:ft, emissiveMap:ft, emissive:0x223044, emissiveIntensity:1.0, roughness:.9}));
+}
 for (let i=0;i<46;i++){
   const a=rng()*Math.PI*2, d=240+rng()*260;
   const x=Math.cos(a)*d, z=Math.sin(a)*d;
   if (z>60 && Math.abs(x)<70) continue;                // keep landing approach clear
-  addBox(x, 0, z, 10+rng()*26, 20+rng()*110, 10+rng()*26, rng()<.5?M.dark:M.concrete, false, rng()*3);
+  const lit = rng()<.45;
+  const mat = lit ? facadeMats[Math.floor(rng()*facadeMats.length)] : (rng()<.5?M.dark:M.concrete);
+  addBox(x, 0, z, 10+rng()*26, 20+rng()*110, 10+rng()*26, mat, false, rng()*3);
 }
 // mid-distance broken structures
 for (let i=0;i<18;i++){
