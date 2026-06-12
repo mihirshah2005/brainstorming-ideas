@@ -25,7 +25,7 @@
 const POST=(function(){
   const A = window.ADDONS;
   let w=innerWidth, h=innerHeight;
-  const rt = new THREE.WebGLRenderTarget(w, h, { samples: 8, type: THREE.HalfFloatType });
+  const rt = new THREE.WebGLRenderTarget(w, h, { samples: 4, type: THREE.HalfFloatType });
   const composer = new A.EffectComposer(renderer, rt);
   composer.addPass(new A.RenderPass(scene, camera));
 
@@ -112,7 +112,8 @@ function animate(){
     astro.position.set(player.x, player.gy, player.z);
     astro.rotation.y=player.yaw;
     astro.rotation.z=onGround? bobS*.04*(moving>0?1:0) : .06;
-    const targetFov = zooming?40:(keys['ShiftLeft']&&moving>0?80:72);
+    const base=window._baseFov||72;
+    const targetFov = zooming?40:(keys['ShiftLeft']&&moving>0?base+8:base);
     player.fov += (targetFov-player.fov)*Math.min(1,dt*7);
     if (Math.abs(player.fov-camera.fov)>.05){ camera.fov=player.fov; camera.updateProjectionMatrix(); }
     camera.getWorldDirection(viewDir);

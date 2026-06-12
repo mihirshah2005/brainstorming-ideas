@@ -63,8 +63,15 @@ Verify with node --check per file + headless playthrough. Commit.
 Headless e2e: on-foot playthrough, ship boarding, flight to Breakwater, landing,
 fragment collection, ending. Screenshot review. README update. Push.
 
+## Phase 6 — Engine modernization  [x]
+- [x] three r128 -> r160 ES modules via import map (jsdelivr), defer-ordered bootstrap
+- [x] EffectComposer: 4x MSAA HDR target, UnrealBloom, FX pass (god rays/CA/vignette/grain), ACES OutputPass, SMAA
+- [x] Image-based lighting: PMREM environment generated from the game's own sky
+- [x] Outer Wilds palette: warm sun against teal dusk, exposure rebalance
+- [x] Photo mode (P) hides all HUD; FIELD OF VIEW setting in pause menu
+
 ## Future (not this session)
-- Photo mode (P): free camera, hide HUD, FOV/roll controls
+- Free-camera photo mode with roll + dolly
 - Interior of the residential tower: elevator ride, 3 apartment floors
 - Weather: drifting rain curtains with wet-ground reflection boost
 - The instrument as a playable 5-note synth; secret chord opens a hidden room

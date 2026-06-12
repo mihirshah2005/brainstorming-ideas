@@ -24,6 +24,7 @@ the final chamber to learn what actually happened.
 | Q | Scanner pulse (pings nearby undiscovered memories through walls) |
 | V | First / third person |
 | M | Survey map |
+| P | Photo mode (hides HUD) |
 | Tab | Toggle memory log |
 | ESC | Pause menu (quality / audio settings) |
 
@@ -68,13 +69,16 @@ js/render.js        post-processing pipeline + main loop
 
 ## Rendering
 
-Hand-rolled on Three.js r128, no post-processing libraries: a custom multi-pass
-pipeline doing bloom, ACES filmic tonemapping, chromatic aberration, vignette,
-film grain, and screen-space god rays from the sun. Plus real-time shadow maps,
-procedural concrete/ground/facade textures, shader-displaced water and ocean,
-a 1,500-star field, a textured ringed gas giant, and animated aurora shaders.
+Three.js r160 (ES modules via import map, still no build step) with the official
+EffectComposer pipeline: 4x MSAA HDR render target, UnrealBloom, a custom FX pass
+(screen-space god rays, chromatic aberration, vignette, film grain), ACES filmic
+tonemapping via OutputPass, and SMAA. The world is lit by image-based lighting:
+a PMREM environment map generated from the game's own sky, so every material
+reflects the dusk it stands in. Plus real-time shadow maps, procedural
+concrete/ground/facade textures, shader-displaced water and ocean, a star field,
+a textured ringed gas giant, and animated aurora shaders.
 
-A quality toggle (ESC menu) drops shadows, pixel ratio, and the second bloom tap
-for lower-end machines.
+Extras: photo mode (P) hides the HUD for clean captures; the pause menu has
+QUALITY (drops bloom/SMAA/shadows/pixel ratio) and FIELD OF VIEW settings.
 
 See `PLAN.md` for the expansion roadmap and remaining future ideas.

@@ -123,10 +123,34 @@ const UI = {};
     if (masterG) masterG.gain.value = audioOn ? .5 : 0;
     miAudio.textContent='AUDIO — '+(audioOn?'ON':'OFF');
   });
+  const miFov=document.getElementById('mi-fov');
+  const FOVS=[65,72,80,90];
+  let fovIdx=1;
+  window._baseFov=72;
+  miFov.addEventListener('click', ()=>{
+    fovIdx=(fovIdx+1)%FOVS.length;
+    window._baseFov=FOVS[fovIdx];
+    miFov.textContent='FIELD OF VIEW — '+FOVS[fovIdx];
+  });
+
+  /* ---------- photo mode ---------- */
+  UI.photo=false;
+  const hudEl=document.getElementById('hud');
+  const frameEl=document.getElementById('frame');
+  const scanEl=document.getElementById('scanlines');
+  const panelE=document.getElementById('panel');
+  function togglePhoto(){
+    UI.photo=!UI.photo;
+    const v=UI.photo?'hidden':'visible';
+    hudEl.style.visibility=v; frameEl.style.visibility=v;
+    scanEl.style.visibility=v; panelE.style.visibility=v;
+    if (typeof tone==='function') tone(UI.photo?1046:880,.07,.04,'square');
+  }
 
   /* ---------- keys ---------- */
   addEventListener('keydown', e=>{
     if (e.code==='KeyM' && started && !endingActive && !dialogOpen) UI.toggleMap();
+    if (e.code==='KeyP' && started && !endingActive && !dialogOpen) togglePhoto();
   });
 
   /* ---------- reticle ---------- */
