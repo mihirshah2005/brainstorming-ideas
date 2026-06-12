@@ -83,6 +83,48 @@
   #dialog .dtext { font-family:Georgia,serif; font-size:14px; line-height:1.75; color:#bdb3d8; white-space:pre-line; }
   #dialog .dhint { margin-top:16px; font-family:Helvetica,Arial,sans-serif; font-size:9px; letter-spacing:3px; color:#564f78; }
 
+  #frame { position:fixed; inset:14px; z-index:21; pointer-events:none; }
+  #frame i { position:absolute; width:26px; height:26px; border:1px solid rgba(140,220,205,.28); }
+  #frame i:nth-child(1){ top:0; left:0; border-right:none; border-bottom:none; }
+  #frame i:nth-child(2){ top:0; right:0; border-left:none; border-bottom:none; }
+  #frame i:nth-child(3){ bottom:0; left:0; border-right:none; border-top:none; }
+  #frame i:nth-child(4){ bottom:0; right:0; border-left:none; border-top:none; }
+  #scanlines { position:fixed; inset:0; z-index:22; pointer-events:none; opacity:.05;
+    background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(160,220,255,.5) 2px 3px); }
+  #ret { position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px;
+    border:1px solid rgba(190,235,225,.35); border-radius:50%;
+    transition:all .22s ease; }
+  #ret.near { transform:scale(1.55); border-color:rgba(130,255,220,.85);
+    box-shadow:0 0 14px rgba(110,255,215,.35); }
+  #boot { position:absolute; left:26px; bottom:46px; font-family:'Courier New',monospace;
+    font-size:11px; letter-spacing:2px; color:#7fe7cf; opacity:0; transition:opacity 1.2s;
+    text-shadow:0 0 8px rgba(127,231,207,.5); }
+  #objective { position:absolute; left:26px; top:22px; font-family:Helvetica,Arial,sans-serif;
+    font-size:10px; letter-spacing:3px; color:rgba(190,225,235,.85); opacity:0; transition:opacity 1s; }
+  #titlecard { position:absolute; left:50%; top:22%; transform:translateX(-50%); text-align:center;
+    opacity:0; transition:opacity 1.4s ease; pointer-events:none; }
+  #titlecard .tcn { font-family:Georgia,serif; font-size:34px; letter-spacing:10px; color:#eee8fa;
+    text-shadow:0 0 26px rgba(140,255,225,.3); }
+  #titlecard .tcs { margin-top:8px; font-family:Georgia,serif; font-style:italic; font-size:13px;
+    color:rgba(170,160,205,.85); letter-spacing:2px; }
+  #mapview { position:fixed; inset:0; z-index:35; display:none; }
+  #mapview canvas { display:block; }
+  #menu { display:flex; flex-direction:column; align-items:center; gap:14px;
+    padding:38px 56px; background:rgba(8,6,20,.85); border:1px solid rgba(140,200,225,.16); }
+  #menu h2 { font-family:Georgia,serif; font-weight:normal; font-size:20px; letter-spacing:8px;
+    color:#e8e2f5; margin-bottom:10px; }
+  #menu .mi { font-family:Helvetica,Arial,sans-serif; font-size:12px; letter-spacing:4px;
+    color:#9fe8d4; cursor:pointer; padding:6px 18px; border:1px solid transparent; }
+  #menu .mi:hover { border-color:rgba(127,231,207,.4); }
+  #menu .mkeys { margin-top:14px; font-family:Helvetica,Arial,sans-serif; font-size:9px;
+    letter-spacing:2px; color:#564f78; line-height:2; text-align:center; }
+  #flighthud { position:absolute; left:50%; bottom:8%; transform:translateX(-50%);
+    display:none; text-align:center; font-family:Helvetica,Arial,sans-serif; }
+  #flighthud .fh-row { font-size:11px; letter-spacing:3px; color:rgba(190,235,225,.85); margin:4px 0; }
+  #flighthud .fh-bar { width:200px; height:4px; margin:6px auto; background:rgba(120,200,190,.15); }
+  #flighthud .fh-bar i { display:block; height:100%; width:0; background:rgba(127,231,207,.8);
+    box-shadow:0 0 8px rgba(127,231,207,.6); }
+  #flighthud .fh-hint { font-size:9px; letter-spacing:3px; color:#564f78; margin-top:6px; }
   #fade { position:fixed; inset:0; z-index:60; background:#000; opacity:0; pointer-events:none; transition:opacity 3s ease; }
   #endlines {
     position:fixed; inset:0; z-index:61; display:none; align-items:center; justify-content:center;
@@ -112,14 +154,33 @@
   <div class="keys">WASD MOVE &middot; SHIFT SPRINT &middot; SPACE JUMP &middot; C CROUCH &middot; MOUSE LOOK &middot; RMB ZOOM<br><br>
   E EXAMINE &middot; F SUIT LIGHT &middot; Q SCANNER &middot; V FIRST/THIRD PERSON &middot; TAB LOG &middot; ESC RELEASE</div>
 </div>
-<div id="paused">CLICK TO CONTINUE</div>
+<div id="paused"><div id="menu">
+  <h2>PAUSED</h2>
+  <div class="mi" id="mi-resume">RESUME</div>
+  <div class="mi" id="mi-quality">QUALITY — HIGH</div>
+  <div class="mi" id="mi-audio">AUDIO — ON</div>
+  <div class="mkeys">WASD MOVE · SHIFT SPRINT · SPACE JUMP · C CROUCH · E EXAMINE · RMB ZOOM<br>
+  F LIGHT · Q SCAN · V VIEW · M MAP · TAB LOG · NEAR SHIP: E BOARD · IN SHIP: W/S THROTTLE · G LAND</div>
+</div></div>
 <div id="hud">
   <div id="compass"></div>
   <div id="dot"></div>
   <div id="prompt">E &nbsp;—&nbsp; EXAMINE</div>
   <div id="counter">MEMORIES&nbsp; 0 / 14</div>
   <div id="toast"></div>
+  <div id="ret"></div>
+  <div id="boot"></div>
+  <div id="objective"></div>
+  <div id="titlecard"><div class="tcn"></div><div class="tcs"></div></div>
+  <div id="flighthud">
+    <div class="fh-row"><span id="fh-spd">0</span> M/S &nbsp;·&nbsp; ALT <span id="fh-alt">0</span> M</div>
+    <div class="fh-bar"><i id="fh-thr"></i></div>
+    <div class="fh-hint" id="fh-hint">W/S THROTTLE · MOUSE STEER · SHIFT BOOST · SPACE/C VERT · G LAND</div>
+  </div>
 </div>
+<div id="frame"><i></i><i></i><i></i><i></i></div>
+<div id="scanlines"></div>
+<div id="mapview"><canvas id="mapcanvas"></canvas></div>
 <div id="panel"><h3>RECOVERED MEMORIES</h3><ul id="log"></ul></div>
 <div id="dialog">
   <div class="dloc"></div>
@@ -145,6 +206,7 @@
 <script src="js/audio.js"></script>
 <script src="js/ending.js"></script>
 <script src="js/suit.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/render.js"></script>
 </body>
 </html>

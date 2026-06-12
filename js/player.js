@@ -31,7 +31,7 @@ titleEl.addEventListener('click', () => {
   if (!started){ started=true; titleEl.classList.add('hidden'); initAudio(); showToast('The lander’s survey marks six structures. Go and see.', 5000); }
   renderer.domElement.requestPointerLock();
 });
-pausedEl.addEventListener('click', () => renderer.domElement.requestPointerLock());
+/* pause-menu clicks are handled in ui.js */
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
   pausedEl.style.display = (!locked && started && !endingActive) ? 'flex' : 'none';
@@ -104,7 +104,7 @@ function findNear(){
 }
 function onInteractKey(){
   if (!started || endingActive) return;
-  if (dialogOpen){ closeDialog(); return; }
+  if (dialogOpen){ if (window.UI && UI.typing()) UI.skipType(); else closeDialog(); return; }
   if (!nearTarget || !locked) return;
   const it = nearTarget;
   if (it.fragId==='END'){
@@ -120,7 +120,8 @@ function openDialog(frag, isNew){
   dialogOpen=true;
   dialogEl.querySelector('.dloc').textContent = frag.loc;
   dialogEl.querySelector('.dtitle').textContent = frag.title;
-  dialogEl.querySelector('.dtext').textContent = frag.text;
+  if (window.UI) UI.type(dialogEl.querySelector('.dtext'), frag.text);
+  else dialogEl.querySelector('.dtext').textContent = frag.text;
   dialogEl.classList.add('show');
   promptEl.style.opacity=0;
   if (isNew) chime();

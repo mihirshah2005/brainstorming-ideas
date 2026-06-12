@@ -43,11 +43,14 @@ const POST=(function(){
     blurMat.uniforms.res.value.set(w>>1,h>>1);
     blurMat.uniforms.dir.value.set(1,0); pass(blurMat,rtA.texture,rtB);
     blurMat.uniforms.dir.value.set(0,1); pass(blurMat,rtB.texture,rtA);
-    blurMat.uniforms.res.value.set(w>>2,h>>2);
-    blurMat.uniforms.dir.value.set(1,0); pass(blurMat,rtA.texture,rtC);
-    blurMat.uniforms.dir.value.set(0,1); pass(blurMat,rtC.texture,rtD);
+    if (!window._lowq){
+      blurMat.uniforms.res.value.set(w>>2,h>>2);
+      blurMat.uniforms.dir.value.set(1,0); pass(blurMat,rtA.texture,rtC);
+      blurMat.uniforms.dir.value.set(0,1); pass(blurMat,rtC.texture,rtD);
+    }
     finalMat.uniforms.t.value=sceneRT.texture;
-    finalMat.uniforms.b1.value=rtA.texture; finalMat.uniforms.b2.value=rtD.texture;
+    finalMat.uniforms.b1.value=rtA.texture;
+    finalMat.uniforms.b2.value=(window._lowq?rtA:rtD).texture;
     finalMat.uniforms.time.value=t;
     quad.material=finalMat; renderer.setRenderTarget(null); renderer.render(scn2,cam2);
   }
@@ -164,6 +167,7 @@ function animate(){
     r.m.material.opacity=.7*Math.max(0,1-r.t/1.3);
     if (r.t>1.3){ scene.remove(r.m); scanRings.splice(i,1); }
   }
+  if (window.UI) UI.update(dt, t);
   for(const m of window._aur) m.uniforms.time.value=t;
   POST.render(t);
 }
