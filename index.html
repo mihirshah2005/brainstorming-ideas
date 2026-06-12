@@ -197,19 +197,35 @@
   <button onclick="location.reload()">WALK AGAIN</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/core.js"></script>
-<script src="js/sky.js"></script>
-<script src="js/world.js"></script>
-<script src="js/locations.js"></script>
-<script src="js/story.js"></script>
-<script src="js/player.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/ending.js"></script>
-<script src="js/suit.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/ship.js"></script>
-<script src="js/sky-locations.js"></script>
-<script src="js/render.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+window.THREE = THREE;
+window.ADDONS = { EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, SMAAPass, OutputPass };
+</script>
+<script defer src="js/core.js"></script>
+<script defer src="js/sky.js"></script>
+<script defer src="js/world.js"></script>
+<script defer src="js/locations.js"></script>
+<script defer src="js/story.js"></script>
+<script defer src="js/player.js"></script>
+<script defer src="js/audio.js"></script>
+<script defer src="js/ending.js"></script>
+<script defer src="js/suit.js"></script>
+<script defer src="js/ui.js"></script>
+<script defer src="js/ship.js"></script>
+<script defer src="js/sky-locations.js"></script>
+<script defer src="js/render.js"></script>
 </body>
 </html>

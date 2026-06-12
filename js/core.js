@@ -14,7 +14,8 @@ const rng = mulberry32(40961);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.outputEncoding = THREE.LinearEncoding;
+renderer.useLegacyLights = true;          // keep pre-r155 light tuning
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // custom post chain does its own transform
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
