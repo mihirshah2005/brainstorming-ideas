@@ -56,7 +56,8 @@ const compassItems=[];
     compassItems.push({el:sp,deg:d,type:'tick'});
   }
   const locs=[['PLAZA',0,40,'#9fd8ff'],['SPIRE',0,-140,'#6fffe0'],['TRANSIT',140,-20,'#7eb8ff'],
-              ['HABITAT',-128,-18,'#c9a8ff'],['DOME',110,-150,'#5affc8'],['CHAMBER',0,-300,'#e0b8ff']];
+              ['HABITAT',-128,-18,'#c9a8ff'],['DOME',110,-150,'#5affc8'],['CHAMBER',0,-300,'#e0b8ff'],
+              ['BREAKWATER',0,560,'#7fd8ff'],['TETHER',500,-560,'#ff8a6a']];
   for(const [n,x,z,c] of locs){
     const sp=document.createElement('span');
     sp.className='locm'; sp.style.color=c;
