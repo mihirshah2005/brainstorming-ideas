@@ -36,7 +36,7 @@ scene.add(sky);
   const gr=g.createLinearGradient(0,0,0,128);
   gr.addColorStop(0,'rgba(255,255,255,.12)'); gr.addColorStop(.55,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,10,.45)');
   g.fillStyle=gr; g.fillRect(0,0,256,128);
-  const tex=new THREE.CanvasTexture(cv);
+  const tex=new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace;
   const planet=new THREE.Mesh(new THREE.SphereGeometry(95,32,24),
     new THREE.MeshStandardMaterial({map:tex,fog:false,roughness:1,metalness:0}));
   planet.position.set(-560,290,-720); planet.rotation.z=.25;
@@ -73,7 +73,7 @@ for(let i=0;i<3;i++){
 const sunDir = new THREE.Vector3(0.45, 0.42, -0.79).normalize();
 const sunDisc = new THREE.Mesh(
   new THREE.CircleGeometry(72, 40),
-  new THREE.MeshBasicMaterial({ color:0xf0f5d8, fog:false, transparent:true, opacity:0.95 })
+  new THREE.MeshBasicMaterial({ color:0xffe9c4, fog:false, transparent:true, opacity:0.95 })
 );
 sunDisc.position.copy(sunDir).multiplyScalar(950);
 sunDisc.lookAt(0,0,0);
@@ -87,8 +87,8 @@ sunHalo.lookAt(0,0,0);
 scene.add(sunHalo);
 
 /* ---------- lights ---------- */
-scene.add(new THREE.HemisphereLight(0x6a5a9e, 0x131e26, 1.15));
-const sunLight = new THREE.DirectionalLight(0xe9e6cc, 0.75);
+scene.add(new THREE.HemisphereLight(0x8a7ac0, 0x223038, 1.15)); // IBL carries the rest
+const sunLight = new THREE.DirectionalLight(0xffe2b8, 0.85);
 sunLight.position.copy(sunDir).multiplyScalar(400);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(2048,2048);

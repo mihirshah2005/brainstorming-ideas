@@ -1,68 +1,75 @@
 /* ============================================================
-   POST-PROCESSING — bloom, ACES, chromatic aberration, vignette, grain
+   RENDER PIPELINE — EffectComposer: MSAA, UnrealBloom, FX, ACES, SMAA
+   + image-based lighting generated from the actual sky
    ============================================================ */
+
+/* ---------- IBL: light the world with its own sky ---------- */
+(function buildEnvironment(){
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  const envSky = sky.clone(); envScene.add(envSky);
+  const envSun = sunDisc.clone(); envScene.add(envSun);
+  const envHalo = sunHalo.clone(); envScene.add(envHalo);
+  const env = pmrem.fromScene(envScene, .035).texture;
+  scene.environment = env;
+  const seen = new Set();
+  scene.traverse(o=>{
+    if (o.isMesh && o.material && o.material.isMeshStandardMaterial && !seen.has(o.material)){
+      seen.add(o.material);
+      o.material.envMapIntensity = .8;
+    }
+  });
+  pmrem.dispose();
+})();
+
 const POST=(function(){
-  const pars={minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat};
-  let w=innerWidth,h=innerHeight;
-  const sceneRT=new THREE.WebGLRenderTarget(w,h,pars);
-  const rtA=new THREE.WebGLRenderTarget(w>>1,h>>1,pars);
-  const rtB=new THREE.WebGLRenderTarget(w>>1,h>>1,pars);
-  const rtC=new THREE.WebGLRenderTarget(w>>2,h>>2,pars);
-  const rtD=new THREE.WebGLRenderTarget(w>>2,h>>2,pars);
-  const cam2=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
-  const scn2=new THREE.Scene();
-  const quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),null);
-  scn2.add(quad);
-  const VS='varying vec2 vUv; void main(){vUv=uv; gl_Position=vec4(position.xy,0.,1.);}';
-  const brightMat=new THREE.ShaderMaterial({uniforms:{t:{value:null}},vertexShader:VS,fragmentShader:
-    'uniform sampler2D t; varying vec2 vUv; void main(){ vec3 c=texture2D(t,vUv).rgb;'+
-    ' float l=dot(c,vec3(.299,.587,.114)); gl_FragColor=vec4(c*smoothstep(.62,.95,l),1.);}'});
-  const blurMat=new THREE.ShaderMaterial({uniforms:{t:{value:null},dir:{value:new THREE.Vector2(1,0)},res:{value:new THREE.Vector2(w,h)}},vertexShader:VS,fragmentShader:
-    'uniform sampler2D t; uniform vec2 dir,res; varying vec2 vUv;\n'+
-    'void main(){ vec2 px=dir/res; vec3 s=texture2D(t,vUv).rgb*.227;\n'+
-    ' s+=(texture2D(t,vUv+px*1.384).rgb+texture2D(t,vUv-px*1.384).rgb)*.316;\n'+
-    ' s+=(texture2D(t,vUv+px*3.230).rgb+texture2D(t,vUv-px*3.230).rgb)*.07;\n'+
-    ' gl_FragColor=vec4(s,1.);}'});
-  const finalMat=new THREE.ShaderMaterial({uniforms:{t:{value:null},b1:{value:null},b2:{value:null},time:{value:0},strength:{value:.85},sunUV:{value:new THREE.Vector2(.5,.7)},sunVis:{value:0}},vertexShader:VS,fragmentShader:
-    'uniform sampler2D t,b1,b2; uniform float time,strength,sunVis; uniform vec2 sunUV; varying vec2 vUv;\n'+
-    'vec3 aces(vec3 x){ return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.); }\n'+
-    'float rnd(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }\n'+
-    'void main(){ vec2 d=(vUv-.5)*.004;\n'+
-    ' vec3 c; c.r=texture2D(t,vUv+d).r; c.g=texture2D(t,vUv).g; c.b=texture2D(t,vUv-d).b;\n'+
-    ' c+=(texture2D(b1,vUv).rgb+texture2D(b2,vUv).rgb)*strength;\n'+
-    ' vec2 dir=(sunUV-vUv); vec3 gr=vec3(0.); float il=1.;\n'+
-    ' for(int gi=0; gi<10; gi++){ vec2 sp=vUv+dir*(float(gi)/10.)*.6; gr+=texture2D(b1,sp).rgb*il; il*=.85; }\n'+
-    ' c+=gr*0.10*sunVis*vec3(1.0,.96,.82);\n'+
-    ' c=aces(c*1.22);\n'+
-    ' float vg=smoothstep(1.25,.45,length(vUv-.5)*1.6); c*=.34+.66*vg;\n'+
-    ' c+=(rnd(vUv*vec2(1920.,1080.)+mod(time,10.)*60.)-.5)*.045*(1.-vg*.5);\n'+
-    ' c=pow(c,vec3(1./2.2));\n'+
-    ' gl_FragColor=vec4(c,1.);}'});
-  function pass(mat,inTex,outRT){ quad.material=mat; if(mat.uniforms.t) mat.uniforms.t.value=inTex;
-    renderer.setRenderTarget(outRT); renderer.render(scn2,cam2); }
+  const A = window.ADDONS;
+  let w=innerWidth, h=innerHeight;
+  const rt = new THREE.WebGLRenderTarget(w, h, { samples: 8, type: THREE.HalfFloatType });
+  const composer = new A.EffectComposer(renderer, rt);
+  composer.addPass(new A.RenderPass(scene, camera));
+
+  const bloomPass = new A.UnrealBloomPass(new THREE.Vector2(w,h), .55, .65, .68);
+  composer.addPass(bloomPass);
+
+  const FXShader = {
+    uniforms: { tDiffuse:{value:null}, time:{value:0}, sunUV:{value:new THREE.Vector2(.5,.7)}, sunVis:{value:0} },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader:
+      'uniform sampler2D tDiffuse; uniform float time,sunVis; uniform vec2 sunUV; varying vec2 vUv;\n'+
+      'float rnd(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }\n'+
+      'void main(){\n'+
+      ' vec2 d=(vUv-.5)*.0026;\n'+
+      ' vec3 c; c.r=texture2D(tDiffuse,vUv+d).r; c.g=texture2D(tDiffuse,vUv).g; c.b=texture2D(tDiffuse,vUv-d).b;\n'+
+      ' vec2 dir=(sunUV-vUv); vec3 gr=vec3(0.); float il=1.;\n'+
+      ' for(int gi=0; gi<12; gi++){ vec2 sp=vUv+dir*(float(gi)/12.)*.55;\n'+
+      '   vec3 sc=texture2D(tDiffuse,sp).rgb; float l=dot(sc,vec3(.299,.587,.114));\n'+
+      '   gr+=sc*smoothstep(.8,1.5,l)*il; il*=.84; }\n'+
+      ' c+=gr*.10*sunVis*vec3(1.,.93,.78);\n'+
+      ' float vg=smoothstep(1.3,.5,length(vUv-.5)*1.6); c*=.62+.38*vg;\n'+
+      ' c+=(rnd(vUv*vec2(1920.,1080.)+mod(time,10.)*60.)-.5)*.03;\n'+
+      ' gl_FragColor=vec4(c,1.); }'
+  };
+  const fxPass = new A.ShaderPass(FXShader);
+  composer.addPass(fxPass);
+
+  const outputPass = new A.OutputPass();
+  composer.addPass(outputPass);
+
+  const smaaPass = new A.SMAAPass(w*renderer.getPixelRatio(), h*renderer.getPixelRatio());
+  composer.addPass(smaaPass);
+
   const _sv=new THREE.Vector3();
   function render(t){
     _sv.copy(sunDir).multiplyScalar(950).project(camera);
-    finalMat.uniforms.sunUV.value.set(_sv.x*.5+.5, _sv.y*.5+.5);
-    finalMat.uniforms.sunVis.value = (_sv.z<1 && Math.abs(_sv.x)<1.3 && Math.abs(_sv.y)<1.3) ? 1 : 0;
-    renderer.setRenderTarget(sceneRT); renderer.render(scene,camera);
-    pass(brightMat,sceneRT.texture,rtA);
-    blurMat.uniforms.res.value.set(w>>1,h>>1);
-    blurMat.uniforms.dir.value.set(1,0); pass(blurMat,rtA.texture,rtB);
-    blurMat.uniforms.dir.value.set(0,1); pass(blurMat,rtB.texture,rtA);
-    if (!window._lowq){
-      blurMat.uniforms.res.value.set(w>>2,h>>2);
-      blurMat.uniforms.dir.value.set(1,0); pass(blurMat,rtA.texture,rtC);
-      blurMat.uniforms.dir.value.set(0,1); pass(blurMat,rtC.texture,rtD);
-    }
-    finalMat.uniforms.t.value=sceneRT.texture;
-    finalMat.uniforms.b1.value=rtA.texture;
-    finalMat.uniforms.b2.value=(window._lowq?rtA:rtD).texture;
-    finalMat.uniforms.time.value=t;
-    quad.material=finalMat; renderer.setRenderTarget(null); renderer.render(scn2,cam2);
+    fxPass.uniforms.sunUV.value.set(_sv.x*.5+.5, _sv.y*.5+.5);
+    fxPass.uniforms.sunVis.value = (_sv.z<1 && Math.abs(_sv.x)<1.3 && Math.abs(_sv.y)<1.3) ? 1 : 0;
+    fxPass.uniforms.time.value=t;
+    bloomPass.enabled = !window._lowq;
+    smaaPass.enabled = !window._lowq;
+    composer.render();
   }
-  function setSize(W,H){ w=W;h=H; sceneRT.setSize(W,H);
-    rtA.setSize(W>>1,H>>1); rtB.setSize(W>>1,H>>1); rtC.setSize(W>>2,H>>2); rtD.setSize(W>>2,H>>2); }
+  function setSize(W,H){ w=W; h=H; composer.setSize(W,H); }
   return {render,setSize};
 })();
 window._post=POST;

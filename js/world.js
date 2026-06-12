@@ -65,13 +65,13 @@ function facadeTexture(seed,glow){
     g.fillRect(i*cw+cw*.2, j*ch+ch*.25, cw*.6, ch*.5);
   }
   g.globalAlpha=1;
-  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
 }
 window.facadeTexture=facadeTexture;
-const concTex=grungeTexture(11,'#8a8f9e','#5a5e6c','#abb0bb',true);
+const concTex=grungeTexture(11,'#8a8f9e','#5a5e6c','#abb0bb',true); concTex.colorSpace=THREE.SRGBColorSpace;
 const concBump=grungeTexture(12,'#808080','#383838','#c8c8c8',true);
 [M.concrete,M.dark,M.pale].forEach(m=>{ m.map=concTex; m.bumpMap=concBump; m.bumpScale=.02; m.needsUpdate=true; });
-const grdTex=grungeTexture(13,'#7d8290','#525662','#9da1ab',false); grdTex.repeat.set(56,56);
+const grdTex=grungeTexture(13,'#7d8290','#525662','#9da1ab',false); grdTex.colorSpace=THREE.SRGBColorSpace; grdTex.repeat.set(56,56);
 const grdBump=grungeTexture(14,'#808080','#2a2a2a','#d6d6d6',false); grdBump.repeat.set(56,56);
 ground.material.map=grdTex; ground.material.bumpMap=grdBump; ground.material.bumpScale=.03; ground.material.needsUpdate=true;
 
@@ -134,7 +134,7 @@ function glyphTexture(seed, cols=8, rows=10, color='#cfeaff', alpha=.85){
     g.stroke();
     if (r()<.3){ g.beginPath(); g.arc(cx,cy+ch*.36,1.8,0,6.28); g.fill(); }
   }
-  const t = new THREE.CanvasTexture(cv); return t;
+  const t = new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; return t;
 }
 function glyphPanel(w,h,seed,glow=0x9fd8ff){
   const mat = new THREE.MeshBasicMaterial({ map:glyphTexture(seed), transparent:true, color:glow, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
