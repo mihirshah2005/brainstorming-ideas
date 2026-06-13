@@ -91,3 +91,6 @@ See `PLAN.md` for the expansion roadmap and remaining future ideas.
 
 ## Credits
 Built with Three.js r160
+
+## Credits
+Built with Three.js r160
