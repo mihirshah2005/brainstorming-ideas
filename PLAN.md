@@ -81,3 +81,7 @@ fragment collection, ending. Screenshot review. README update. Push.
 ## v1.1 Ideas
 - Weather system (acid rain, dust storms)
 - NPC ghost echoes
+
+## v1.1 Ideas
+- Weather system
+- NPC ghost echoes
