@@ -86,3 +86,8 @@ See `PLAN.md` for the expansion roadmap and remaining future ideas.
 ## Tips
 - Use Q (scanner pulse) early — it reveals hidden memories through walls
 - Visit the Breakwater at dusk for the best view
+
+> Tip: scan early, the Breakwater is best at dusk.
+
+## Credits
+Built with Three.js r160

@@ -77,3 +77,7 @@ fragment collection, ending. Screenshot review. README update. Push.
 - The instrument as a playable 5-note synth; secret chord opens a hidden room
 - Save/continue via localStorage (needs non-artifact hosting)
 - Gamepad support
+
+## v1.1 Ideas
+- Weather system (acid rain, dust storms)
+- NPC ghost echoes
