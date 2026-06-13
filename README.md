@@ -82,3 +82,7 @@ Extras: photo mode (P) hides the HUD for clean captures; the pause menu has
 QUALITY (drops bloom/SMAA/shadows/pixel ratio) and FIELD OF VIEW settings.
 
 See `PLAN.md` for the expansion roadmap and remaining future ideas.
+
+## Tips
+- Use Q (scanner pulse) early — it reveals hidden memories through walls
+- Visit the Breakwater at dusk for the best view
